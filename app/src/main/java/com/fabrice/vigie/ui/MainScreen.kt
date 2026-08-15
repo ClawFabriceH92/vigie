@@ -1,5 +1,11 @@
 package com.fabrice.vigie.ui
 
+import android.util.Size
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
+import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -19,11 +25,9 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -35,23 +39,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fabrice.vigie.SurveillanceMode
 import com.fabrice.vigie.SurveillanceViewModel
-import com.fabrice.vigie.camera.CameraBridge
-import com.fabrice.vigie.camera.CameraController
 import com.fabrice.vigie.ui.theme.AlertRed
 import com.fabrice.vigie.ui.theme.Amber
 import com.fabrice.vigie.ui.theme.DeepNight
 import com.fabrice.vigie.ui.theme.NightBlue
 import com.fabrice.vigie.ui.theme.TrustGreen
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import java.io.File
 
 /**
- * Écran principal : la caméra reste TOUJOURS active (visible sur l'onglet
- * Caméra, cachée derrière les autres onglets), + NavigationBar 4 onglets.
+ * Écran principal : le preview caméra est lié à l'activité (affichage seul),
+ * l'analyse (détection + flux) et le burst vivent dans VigieService.
  */
 @Composable
 fun MainScreen(vm: SurveillanceViewModel) {
@@ -59,40 +59,24 @@ fun MainScreen(vm: SurveillanceViewModel) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val previewView = remember { PreviewView(context) }
-    val controller = remember { CameraController(context, lifecycleOwner, previewView) }
-    val scope = rememberCoroutineScope()
 
+    // Preview lié à l'activité — NE PAS unbindAll (l'analyse du service est liée au sien)
     LaunchedEffect(Unit) {
-        controller.start()
-        CameraBridge.burstCaptureRequested = {
-            val dir = vm.burstTargetDir.value
-            if (dir != null) {
-                val count = vm.settings.value.burstCount
-                val interval = vm.settings.value.burstIntervalMs
-                fun next(i: Int) {
-                    if (i >= count) return
-                    val f = File(dir, "photo_${(i + 1).toString().padStart(2, '0')}.jpg")
-                    controller.capturePhoto(f) { _ ->
-                        CameraBridge.onBurstPhoto?.invoke(f)
-                        scope.launch {
-                            delay(interval)
-                            next(i + 1)
-                        }
-                    }
-                }
-                next(0)
-            }
-        }
-    }
-    DisposableEffect(Unit) {
-        onDispose {
-            controller.stop()
-            CameraBridge.burstCaptureRequested = null
-        }
+        val future = ProcessCameraProvider.getInstance(context)
+        future.addListener({
+            val provider = future.get()
+            val preview = Preview.Builder()
+                .setResolutionSelector(ResolutionSelector.Builder()
+                    .setResolutionStrategy(ResolutionStrategy(Size(1280, 720), ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER))
+                    .build())
+                .build()
+            preview.setSurfaceProvider(previewView.surfaceProvider)
+            provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview)
+        }, ContextCompat.getMainExecutor(context))
     }
 
     Box(Modifier.fillMaxSize().background(DeepNight)) {
-        // Caméra toujours active : visible sur l'accueil, cachée sinon
+        // Caméra toujours affichée : visible sur l'accueil, cachée sinon
         AndroidView(
             factory = { previewView },
             modifier = Modifier
