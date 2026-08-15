@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Vigie" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#0D2B4E</item>
+        <item name="android:navigationBarColor">#0A1F38</item>
+        <item name="android:windowBackground">#0A1F38</item>
+    </style>
+</resources>
