@@ -114,7 +114,10 @@ object VigieRuntime {
     }
 
     private fun startServer() {
-        server = MjpegServer { settings.value.streamPassword }
+        server = MjpegServer(
+            userProvider = { settings.value.streamUser },
+            passwordProvider = { settings.value.streamPassword },
+        )
         try {
             server?.start(10_000, false)
             streamRunning.value = true

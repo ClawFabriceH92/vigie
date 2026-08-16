@@ -43,6 +43,7 @@ import com.fabrice.vigie.SurveillanceViewModel
 import com.fabrice.vigie.VigieRuntime
 import com.fabrice.vigie.data.SettingsStore
 import com.fabrice.vigie.security.PinHasher
+import com.fabrice.vigie.security.SecureGenerator
 import com.fabrice.vigie.ui.theme.AlertRed
 import com.fabrice.vigie.ui.theme.DeepNight
 import com.fabrice.vigie.ui.theme.TrustGreen
@@ -82,32 +83,6 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
                 }
                 TextButton(onClick = { showPinDialog = true }) { Text("Changer") }
             }
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = settings.streamPassword,
-                onValueChange = { vm.updateSettings(settings.copy(streamPassword = it)) },
-                label = { Text("Mot de passe du flux (connexion à distance)") },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                isError = !PinHasher.isStrong(settings.streamPassword),
-                supportingText = {
-                    Text(
-                        if (PinHasher.isStrong(settings.streamPassword)) {
-                            "✓ Mot de passe fort"
-                        } else {
-                            "Faible — 12 caractères min, lettre + chiffre + symbole requis"
-                        },
-                        color = if (PinHasher.isStrong(settings.streamPassword)) TrustGreen else AlertRed,
-                    )
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                "Connexion à distance : utilisateur « vigie » + ce mot de passe (flux + intercom)",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
 
         SectionCard("Détection de mouvement") {
@@ -167,6 +142,52 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
             ) {
                 Text("Tout supprimer")
             }
+        }
+
+        SectionCard("Accès à distance (flux + intercom)") {
+            OutlinedTextField(
+                value = settings.streamUser,
+                onValueChange = { vm.updateSettings(settings.copy(streamUser = it)) },
+                label = { Text("Utilisateur") },
+                singleLine = true,
+                trailingIcon = {
+                    TextButton(onClick = {
+                        vm.updateSettings(settings.copy(streamUser = SecureGenerator.username()))
+                    }) { Text("🎲 Aléatoire") }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = settings.streamPassword,
+                onValueChange = { vm.updateSettings(settings.copy(streamPassword = it)) },
+                label = { Text("Mot de passe") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                isError = !PinHasher.isStrong(settings.streamPassword),
+                supportingText = {
+                    Text(
+                        if (PinHasher.isStrong(settings.streamPassword)) {
+                            "✓ Mot de passe fort"
+                        } else {
+                            "Faible — 12 caractères min, lettre + chiffre + symbole requis"
+                        },
+                        color = if (PinHasher.isStrong(settings.streamPassword)) TrustGreen else AlertRed,
+                    )
+                },
+                trailingIcon = {
+                    TextButton(onClick = {
+                        vm.updateSettings(settings.copy(streamPassword = SecureGenerator.password()))
+                    }) { Text("🎲 Aléatoire") }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "Sans caractères ambigus (O/0, I/l/1…) — lisibles et recopiables. Utilisateur et mot de passe protègent le flux (port 8080) et l'intercom (port 8081).",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         SectionCard("Envoi de photos par email") {

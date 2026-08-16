@@ -17,13 +17,13 @@ import java.util.concurrent.CopyOnWriteArrayList
  * Alimenté par [publish] depuis le pipeline caméra.
  */
 class MjpegServer(
+    private val userProvider: () -> String,
     private val passwordProvider: () -> String,
 ) : NanoHTTPD(PORT) {
 
     companion object {
         const val PORT = 8080
         private const val BOUNDARY = "frame"
-        private const val USER = "vigie"
     }
 
     @Volatile
@@ -66,7 +66,7 @@ class MjpegServer(
 
     private fun isAuthorized(session: IHTTPSession): Boolean {
         val password = passwordProvider()
-        val expected = "Basic " + Base64.encodeToString("$USER:$password".toByteArray(), Base64.NO_WRAP)
+        val expected = "Basic " + Base64.encodeToString("${userProvider()}:$password".toByteArray(), Base64.NO_WRAP)
         val auth = session.headers["authorization"] ?: return false
         return auth == expected
     }

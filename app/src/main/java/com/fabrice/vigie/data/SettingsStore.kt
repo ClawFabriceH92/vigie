@@ -23,6 +23,7 @@ class SettingsStore(context: Context) {
         val trustEnabled: Boolean = true,     // mode confiance actif
         val autoUpdate: Boolean = true,       // vérifier + installer les MAJ automatiquement
         val emailRecipient: String = "",      // destinataire pour l'envoi des photos par email
+        val streamUser: String = "vigie",     // nom d'utilisateur pour l'accès distant
     )
 
     fun load(): Settings = Settings(
@@ -37,6 +38,7 @@ class SettingsStore(context: Context) {
         trustEnabled = prefs.getBoolean("trust_enabled", true),
         autoUpdate = prefs.getBoolean("auto_update", true),
         emailRecipient = prefs.getString("email_recipient", "") ?: "",
+        streamUser = prefs.getString("stream_user", "vigie") ?: "vigie",
     )
 
     fun save(s: Settings) {
@@ -52,6 +54,7 @@ class SettingsStore(context: Context) {
             .putBoolean("trust_enabled", s.trustEnabled)
             .putBoolean("auto_update", s.autoUpdate)
             .putString("email_recipient", s.emailRecipient)
+            .putString("stream_user", s.streamUser)
             .apply()
     }
 }
