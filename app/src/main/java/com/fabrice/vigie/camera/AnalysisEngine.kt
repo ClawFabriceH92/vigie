@@ -267,7 +267,14 @@ class AnalysisEngine(
         // Lie analyse + vidéo (remplace photo temporairement)
         if (!bindAnalysisAndVideo(provider)) return false
         val dir = File(context.filesDir, "videos").apply { mkdirs() }
-        val file = File(dir, "vigie_${System.currentTimeMillis()}.mp4")
+        val stamp = java.text.SimpleDateFormat("yyyy_MM_dd_HH_mm_ss", java.util.Locale.US)
+            .format(java.util.Date())
+        var file = File(dir, "SURVEILLANCE_$stamp.mp4")
+        var suffix = 2
+        while (file.exists()) {
+            file = File(dir, "SURVEILLANCE_${stamp}_$suffix.mp4")
+            suffix++
+        }
         val options = FileOutputOptions.Builder(file).build()
         return try {
             val prepared = vc.output.prepareRecording(context, options)

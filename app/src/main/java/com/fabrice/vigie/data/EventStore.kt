@@ -37,9 +37,10 @@ class EventStore(private val context: Context) {
         return dir to event
     }
 
-    /** Ajoute une photo à un événement (retourne le fichier créé). */
+    /** Ajoute une photo à un événement (retourne le fichier créé). Nom = SURVEILLANCE_AAAA_MM_JJ_HH_MM_SS_XX.jpg */
     fun addPhoto(dir: File, index: Int): File {
-        val f = File(dir, "photo_${index.toString().padStart(2, '0')}.jpg")
+        val stamp = SimpleDateFormat("yyyy_MM_dd_HH_mm_ss", Locale.US).format(Date())
+        val f = File(dir, "SURVEILLANCE_${stamp}_${index.toString().padStart(2, '0')}.jpg")
         return f
     }
 
