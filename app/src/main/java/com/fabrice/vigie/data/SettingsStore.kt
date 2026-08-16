@@ -27,6 +27,8 @@ class SettingsStore(context: Context) {
         val jpegQuality: Int = 80,            // qualité du flux MJPEG (50..95)
         val analysisHeight: Int = 480,        // hauteur d'analyse/flux (480 ou 720)
         val streamPort: Int = 8080,           // port du serveur HTTP (flux + contrôle)
+        val screenTimeoutMin: Int = 0,        // 0 = écran toujours allumé ; sinon extinction après X min
+        val batteryAlertThreshold: Int = 20,  // % de batterie déclenchant l'alerte (0 = désactivé)
     )
 
     fun load(): Settings = Settings(
@@ -45,6 +47,8 @@ class SettingsStore(context: Context) {
         jpegQuality = prefs.getInt("jpeg_quality", 80),
         analysisHeight = prefs.getInt("analysis_height", 480),
         streamPort = prefs.getInt("stream_port", 8080),
+        screenTimeoutMin = prefs.getInt("screen_timeout_min", 0),
+        batteryAlertThreshold = prefs.getInt("battery_alert_threshold", 20),
     )
 
     fun save(s: Settings) {
@@ -64,6 +68,8 @@ class SettingsStore(context: Context) {
             .putInt("jpeg_quality", s.jpegQuality)
             .putInt("analysis_height", s.analysisHeight)
             .putInt("stream_port", s.streamPort)
+            .putInt("screen_timeout_min", s.screenTimeoutMin)
+            .putInt("battery_alert_threshold", s.batteryAlertThreshold)
             .apply()
     }
 }

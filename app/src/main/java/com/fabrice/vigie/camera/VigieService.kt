@@ -66,6 +66,7 @@ class VigieService : LifecycleService() {
         CameraBridge.videoStopRequested = { engine?.stopVideoRecording() }
         CameraBridge.videoListProvider = { engine?.videoList() ?: emptyList() }
         CameraBridge.videoFileProvider = { name -> engine?.videoFile(name) }
+        com.fabrice.vigie.power.PowerMonitorReceiver.register(this)
         VigieRuntime.serviceRunning.value = true
         notifHandler.post(notifTicker)
     }

@@ -157,6 +157,40 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
             Text("🎥 Enregistrement vidéo : HD (720p), déclenchable à distance via /video/start, /video/stop, /video/list sur le port 8080. Les fichiers MP4 sont téléchargeables depuis /video/list.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
+        SectionCard("Écran & batterie") {
+            Text("Extinction de l'écran : ${if (settings.screenTimeoutMin == 0) "jamais (toujours allumé)" else "après ${settings.screenTimeoutMin} min sans toucher"}", style = MaterialTheme.typography.titleMedium)
+            Slider(
+                value = settings.screenTimeoutMin.toFloat(),
+                onValueChange = { vm.updateSettings(settings.copy(screenTimeoutMin = it.toInt())) },
+                valueRange = 0f..60f,
+                steps = 11,
+            )
+            Text(
+                "0 = écran toujours allumé (défaut). Au-delà, l'écran s'éteint pour économiser la batterie ; tout toucher le rallume.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text("Alerte batterie faible : ${if (settings.batteryAlertThreshold == 0) "désactivée" else "à ${settings.batteryAlertThreshold}%"}", style = MaterialTheme.typography.titleMedium)
+            Slider(
+                value = settings.batteryAlertThreshold.toFloat(),
+                onValueChange = { vm.updateSettings(settings.copy(batteryAlertThreshold = it.toInt())) },
+                valueRange = 0f..50f,
+                steps = 9,
+            )
+            Text(
+                "Notification quand la batterie passe sous ce seuil. 0 = désactivé.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "🔌 Notification automatique en cas de coupure de courant (Vigie sur batterie) et de reprise de courant.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         SectionCard("Mode confiance (présence réseau)") {
             Row(
                 Modifier.fillMaxWidth(),

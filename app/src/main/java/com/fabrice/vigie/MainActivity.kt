@@ -4,6 +4,9 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.MotionEvent
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -33,10 +36,23 @@ class MainActivity : FragmentActivity() {
 
     private val vm: SurveillanceViewModel by viewModels()
 
+    // Minuteur d'extinction d'écran (économie de batterie)
+    private val screenHandler = Handler(Looper.getMainLooper())
+    private val screenTicker = object : Runnable {
+        override fun run() {
+            val timeoutMin = VigieRuntime.settings.value.screenTimeoutMin
+            if (timeoutMin > 0) {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Le vieux téléphone reste branché : ne jamais laisser l'écran se verrouiller
+        // Le vieux téléphone reste branché : l'écran reste allumé sauf si un
+        // délai d'extinction est configuré (screenTimeoutMin > 0).
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        resetScreenTimeout()
 
         setContent {
             VigieTheme {
@@ -94,6 +110,26 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    private fun resetScreenTimeout() {
+        screenHandler.removeCallbacks(screenTicker)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        val timeoutMin = VigieRuntime.settings.value.screenTimeoutMin
+        if (timeoutMin > 0) {
+            screenHandler.postDelayed(screenTicker, timeoutMin * 60_000L)
+        }
+    }
+
+    // Tout toucher remet le minuteur d'extinction à zéro (l'écran reste allumé)
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.action == MotionEvent.ACTION_DOWN) resetScreenTimeout()
+        return super.dispatchTouchEvent(ev)
+    }
+
+    override fun onDestroy() {
+        screenHandler.removeCallbacks(screenTicker)
+        super.onDestroy()
     }
 
     private fun showBiometricPrompt() {
