@@ -380,9 +380,9 @@ class MjpegServer(
               <h1>👁 Vigie — contrôle à distance</h1>
               <div class="menu">
                 <a href="/" class="active">📺 Flux</a>
-                <button class="menubtn" id="navVideos">🎥 Vidéos</button>
-                <button class="menubtn" id="navPhotos">📷 Photos</button>
-                <a href="/snapshot" target="_blank">📸 Photo</a>
+                <button class="menubtn" id="navVideos">🎬 Voir la galerie de vidéos</button>
+                <button class="menubtn" id="navPhotos">🖼 Voir la galerie de photos</button>
+                <a href="/snapshot" target="_blank">📸 Prendre un snapshot</a>
               </div>
               <div class="stream-wrap">
                 <img src="/stream" alt="Flux Vigie" id="liveImg">
@@ -400,12 +400,12 @@ class MjpegServer(
               </div>
               <p class="status" id="status">Connexion intercom…</p>
               <div id="videosPanel" class="panel hidden">
-                <h2>🎥 Vidéos enregistrées</h2>
+                <h2>🎬 Galerie de vidéos</h2>
                 <div id="videosList"></div>
                 <button id="clearVideos" class="danger">🗑 Supprimer toutes les vidéos</button>
               </div>
               <div id="photosPanel" class="panel hidden">
-                <h2>📷 Photos des événements</h2>
+                <h2>🖼 Galerie de photos</h2>
                 <div id="photosList"></div>
                 <button id="clearPhotos" class="danger">🗑 Supprimer toutes les photos</button>
               </div>
