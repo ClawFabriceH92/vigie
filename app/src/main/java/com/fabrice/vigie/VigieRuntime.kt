@@ -84,7 +84,16 @@ object VigieRuntime {
         trustedDevices = TrustedDevices(appContext)
         eventStore = EventStore(appContext)
         settings.value = settingsStore.load()
-        locked.value = settings.value.pinHash.isNotEmpty()
+        // PIN par défaut 0000 : au 1er lancement on ne demande pas de créer un code,
+        // on verrouille avec 0000 (l'utilisateur peut le changer dans Réglages).
+        if (settings.value.pinHash.isEmpty()) {
+            val s = settings.value.copy(pinHash = PinHasher.hash("0000"))
+            settings.value = s
+            settingsStore.save(s)
+            locked.value = false
+        } else {
+            locked.value = settings.value.pinHash.isNotEmpty()
+        }
 
         CameraBridge.onMotionScore = { score -> onMotionScore(score) }
         CameraBridge.onJpegFrame = { jpeg -> server?.publish(jpeg) }
@@ -150,7 +159,7 @@ object VigieRuntime {
 
     private fun updateTrust(devices: List<NetworkScanner.Device>) {
         lastScanDevices.value = devices
-        val present = devices.filter { it.mac.isNotEmpty() && trustedDevices.isTrusted(it.mac) }
+        val present = devices.filter { trustedDevices.isDeviceTrusted(it.mac, it.ip) }
         trustedPresent.value = present
         if (present.isNotEmpty()) {
             lastTrustSeenMs = System.currentTimeMillis()
@@ -316,12 +325,26 @@ object VigieRuntime {
         nextScanAt = 0L
     }
 
+    fun addTrustedDeviceByIp(ip: String, name: String) {
+        trustedDevices.addByIp(ip, name)
+        nextScanAt = 0L
+    }
+
     fun removeTrustedDevice(mac: String) {
         trustedDevices.remove(mac)
         nextScanAt = 0L
     }
 
+    fun removeTrustedDeviceByIp(ip: String) {
+        trustedDevices.removeByIp(ip)
+        nextScanAt = 0L
+    }
+
     fun isTrusted(mac: String): Boolean = trustedDevices.isTrusted(mac)
+
+    fun isTrustedIp(ip: String): Boolean = trustedDevices.isTrustedIp(ip)
+
+    fun isDeviceTrusted(mac: String, ip: String): Boolean = trustedDevices.isDeviceTrusted(mac, ip)
 
     // ---------- Détection de mouvement ----------
 

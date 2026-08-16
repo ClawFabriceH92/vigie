@@ -30,4 +30,32 @@ class PinHasherTest {
     fun `hash fait 64 caracteres hex`() {
         assertEquals(64, PinHasher.hash("0000").length)
     }
+
+    @Test
+    fun `mot de passe fort accepte`() {
+        assertTrue(PinHasher.isStrong("Vigie!2026xy"))
+        assertTrue(PinHasher.isStrong("S3cur1té#Maison"))
+        assertTrue(PinHasher.isStrong("abcDEF123!@#"))
+    }
+
+    @Test
+    fun `mot de passe trop court refuse`() {
+        assertFalse(PinHasher.isStrong("Ab1!x"))
+        assertFalse(PinHasher.isStrong("Vigie!2026"))
+    }
+
+    @Test
+    fun `mot de passe sans symbole refuse`() {
+        assertFalse(PinHasher.isStrong("Vigie2026Maison"))
+    }
+
+    @Test
+    fun `mot de passe sans chiffre refuse`() {
+        assertFalse(PinHasher.isStrong("Vigie!MaisonDeux"))
+    }
+
+    @Test
+    fun `mot de passe sans lettre refuse`() {
+        assertFalse(PinHasher.isStrong("12345678!@#"))
+    }
 }

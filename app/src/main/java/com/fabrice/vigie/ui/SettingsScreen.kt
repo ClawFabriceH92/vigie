@@ -42,6 +42,7 @@ import com.fabrice.vigie.BuildConfig
 import com.fabrice.vigie.SurveillanceViewModel
 import com.fabrice.vigie.VigieRuntime
 import com.fabrice.vigie.data.SettingsStore
+import com.fabrice.vigie.security.PinHasher
 import com.fabrice.vigie.ui.theme.AlertRed
 import com.fabrice.vigie.ui.theme.DeepNight
 import com.fabrice.vigie.ui.theme.TrustGreen
@@ -74,7 +75,7 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
                 Column {
                     Text("Code PIN", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        if (settings.pinHash.isNotEmpty()) "Activé — verrouille l'app" else "Non défini",
+                        if (settings.pinHash.isNotEmpty()) "Activé — verrouille l'app (défaut 0000)" else "Non défini",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -85,14 +86,25 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
             OutlinedTextField(
                 value = settings.streamPassword,
                 onValueChange = { vm.updateSettings(settings.copy(streamPassword = it)) },
-                label = { Text("Mot de passe du flux") },
+                label = { Text("Mot de passe du flux (connexion à distance)") },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                isError = !PinHasher.isStrong(settings.streamPassword),
+                supportingText = {
+                    Text(
+                        if (PinHasher.isStrong(settings.streamPassword)) {
+                            "✓ Mot de passe fort"
+                        } else {
+                            "Faible — 12 caractères min, lettre + chiffre + symbole requis"
+                        },
+                        color = if (PinHasher.isStrong(settings.streamPassword)) TrustGreen else AlertRed,
+                    )
+                },
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                "Protège http://<ip>:8080 (flux réseau + distant)",
+                "Connexion à distance : utilisateur « vigie » + ce mot de passe (flux + intercom)",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

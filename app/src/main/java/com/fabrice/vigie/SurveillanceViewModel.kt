@@ -71,8 +71,12 @@ class SurveillanceViewModel(application: Application) : AndroidViewModel(applica
     // Confiance
     fun trustedDevicesList(): List<TrustedDevices.TrustedDevice> = VigieRuntime.trustedDevicesList()
     fun addTrustedDevice(mac: String, name: String) = VigieRuntime.addTrustedDevice(mac, name)
+    fun addTrustedDeviceByIp(ip: String, name: String) = VigieRuntime.addTrustedDeviceByIp(ip, name)
     fun removeTrustedDevice(mac: String) = VigieRuntime.removeTrustedDevice(mac)
+    fun removeTrustedDeviceByIp(ip: String) = VigieRuntime.removeTrustedDeviceByIp(ip)
     fun isTrusted(mac: String): Boolean = VigieRuntime.isTrusted(mac)
+    fun isTrustedIp(ip: String): Boolean = VigieRuntime.isTrustedIp(ip)
+    fun isDeviceTrusted(mac: String, ip: String): Boolean = VigieRuntime.isDeviceTrusted(mac, ip)
 
     // Journal
     fun listEvents(): List<EventStore.Event> = VigieRuntime.listEvents()

@@ -125,7 +125,7 @@ private fun DeviceTrustRow(
     tick: Int,
     onToggled: () -> Unit,
 ) {
-    val trusted = remember(device.mac, tick) { vm.isTrusted(device.mac) }
+    val trusted = remember(device.mac, device.ip, tick) { vm.isDeviceTrusted(device.mac, device.ip) }
     val displayName = remember(device) {
         when {
             device.hostname.isNotBlank() -> device.hostname
@@ -134,6 +134,7 @@ private fun DeviceTrustRow(
     }
     val vendor = remember(device) { NetworkScanner.vendorFor(device.mac) }
     val hasMac = device.mac.isNotEmpty()
+    val canTrust = hasMac || device.ip.isNotEmpty()
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -165,7 +166,7 @@ private fun DeviceTrustRow(
                     if (hasMac) {
                         "${device.mac}${if (vendor.isNotEmpty()) " · $vendor" else ""}"
                     } else {
-                        "MAC masquée — non détectable comme confiance"
+                        "MAC masquée — confiance par IP"
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -174,10 +175,15 @@ private fun DeviceTrustRow(
                     Text(device.ip, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            if (hasMac) {
+            if (canTrust) {
                 Switch(checked = trusted, onCheckedChange = { on ->
-                    if (on) vm.addTrustedDevice(device.mac, displayName)
-                    else vm.removeTrustedDevice(device.mac)
+                    if (on) {
+                        if (hasMac) vm.addTrustedDevice(device.mac, displayName)
+                        else vm.addTrustedDeviceByIp(device.ip, displayName)
+                    } else {
+                        if (hasMac) vm.removeTrustedDevice(device.mac)
+                        else vm.removeTrustedDeviceByIp(device.ip)
+                    }
                     onToggled()
                 })
             }
