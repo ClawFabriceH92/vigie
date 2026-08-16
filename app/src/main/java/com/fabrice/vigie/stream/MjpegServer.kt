@@ -138,32 +138,41 @@ class MjpegServer(
     }
 
     private fun pageResponse(): Response {
-        val html = """
-            <!DOCTYPE html>
+        val html = """            <!DOCTYPE html>
             <html lang="fr">
             <head>
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width, initial-scale=1">
-              <title>Vigie — flux + intercom</title>
+              <title>Vigie — contrôle à distance</title>
               <style>
                 body { background:#0A1F38; color:#FAF6EF; font-family:sans-serif; margin:0; display:flex; flex-direction:column; align-items:center; padding:12px; }
-                h1 { color:#C9972B; margin:8px 0; }
+                h1 { color:#C9972B; margin:8px 0; font-size:22px; }
                 img { max-width:100%; height:auto; border-radius:10px; }
+                .menu { display:flex; gap:8px; margin:10px 0; flex-wrap:wrap; justify-content:center; }
+                .menu a { background:#16294a; color:#E3B75C; text-decoration:none; padding:8px 14px; border-radius:10px; font-size:14px; font-weight:bold; }
+                .menu a.active { background:#C9972B; color:#0A1F38; }
                 .info { color:#B8C7DA; font-size:14px; }
                 .controls { display:flex; gap:10px; margin:12px 0; align-items:center; flex-wrap:wrap; justify-content:center; }
                 button { background:#C9972B; color:#0A1F38; border:none; border-radius:12px; padding:14px 18px; font-size:16px; font-weight:bold; cursor:pointer; }
                 button:active { background:#E3B75C; }
                 button.off { background:#444; color:#aaa; }
                 button.listening { background:#2E7D32; color:#fff; }
+                button.rec { background:#C62828; color:#fff; }
                 .status { color:#81C784; font-size:13px; min-height:18px; }
                 .status.err { color:#E57373; }
               </style>
             </head>
             <body>
-              <h1>👁 Vigie</h1>
+              <h1>👁 Vigie — contrôle à distance</h1>
+              <div class="menu">
+                <a href="/" class="active">📺 Flux</a>
+                <a href="/video/list">🎥 Vidéos</a>
+                <a href="/snapshot" target="_blank">📸 Photo</a>
+              </div>
               <img src="/stream" alt="Flux Vigie">
               <p class="info">Flux temps réel — protégé par mot de passe</p>
               <div class="controls">
+                <button id="recBtn">🎥 Enregistrer</button>
                 <button id="talkBtn" class="off" disabled>🔇 Parler</button>
                 <button id="listenBtn" class="off" disabled>🔈 Écouter</button>
               </div>
@@ -177,16 +186,47 @@ class MjpegServer(
                 let micStream = null;
                 let talkNode = null;
                 let listenNode = null;
+                let recording = false;
                 const queue = [];
 
                 const statusEl = document.getElementById("status");
                 const talkBtn = document.getElementById("talkBtn");
                 const listenBtn = document.getElementById("listenBtn");
+                const recBtn = document.getElementById("recBtn");
 
                 function setStatus(text, err) {
                   statusEl.textContent = text;
                   statusEl.className = "status" + (err ? " err" : "");
                 }
+
+                // ---- Enregistrement vidéo à distance ----
+                async function toggleRecording() {
+                  recBtn.disabled = true;
+                  try {
+                    if (!recording) {
+                      const r = await fetch("/video/start");
+                      recording = r.ok;
+                      if (recording) {
+                        recBtn.textContent = "⏹ Arrêter l'enregistrement";
+                        recBtn.classList.add("rec");
+                        setStatus("🔴 Enregistrement vidéo en cours…");
+                      } else {
+                        setStatus("⚠ Impossible de démarrer (déjà en cours ?)", true);
+                      }
+                    } else {
+                      const r = await fetch("/video/stop");
+                      recording = false;
+                      recBtn.textContent = "🎥 Enregistrer";
+                      recBtn.classList.remove("rec");
+                      setStatus("⏹ Enregistrement arrêté — voir 🎥 Vidéos");
+                    }
+                  } catch (e) {
+                    setStatus("⚠ Erreur contrôle vidéo", true);
+                  } finally {
+                    recBtn.disabled = false;
+                  }
+                }
+                recBtn.addEventListener("click", toggleRecording);
 
                 ws = new WebSocket(WS_URL);
                 ws.binaryType = "arraybuffer";
