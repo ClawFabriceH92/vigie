@@ -85,14 +85,41 @@ class AnalysisEngine(
             videoCapture = VideoCapture.withOutput(recorder)
 
             // NE PAS unbindAll() : le Preview de l'activité est lié séparément.
-            provider.bindToLifecycle(
-                lifecycleOwner,
-                CameraSelector.DEFAULT_BACK_CAMERA,
-                analysis,
-                imageCapture,
-                videoCapture,
-            )
+            // Dégradation progressive : sur les vieux téléphones, 3 use cases en
+            // parallèle (analyse + photo + vidéo) peuvent dépasser les capacités
+            // → on retire la vidéo puis la photo, jamais l'analyse (flux vital).
+            bindWithFallback(provider, analysis, imageCapture, videoCapture)
         }, ContextCompat.getMainExecutor(context))
+    }
+
+    private fun bindWithFallback(
+        provider: ProcessCameraProvider,
+        analysis: ImageAnalysis,
+        imageCapture: ImageCapture?,
+        videoCapture: VideoCapture<Recorder>?,
+    ) {
+        val selector = CameraSelector.DEFAULT_BACK_CAMERA
+        val attempts = listOf(
+            listOfNotNull(analysis, imageCapture, videoCapture),
+            listOfNotNull(analysis, imageCapture),
+            listOfNotNull(analysis),
+        )
+        for (attempt in attempts) {
+            try {
+                provider.bindToLifecycle(lifecycleOwner, selector, *attempt.toTypedArray())
+                if (videoCapture != null && attempt.contains(videoCapture)) {
+                    android.util.Log.i("VigieCam", "Binding complet (analyse + photo + vidéo)")
+                } else if (attempt.size < 3) {
+                    android.util.Log.w("VigieCam", "Binding réduit à ${attempt.size} use case(s) — vidéo indisponible")
+                    // La vidéo n'a pas pu être liée : on la désactive proprement
+                    this.videoCapture = null
+                }
+                return
+            } catch (_: Exception) {
+                android.util.Log.w("VigieCam", "Binding ${attempt.size} use case(s) échoué, tentative réduite")
+            }
+        }
+        android.util.Log.e("VigieCam", "Aucun binding caméra possible")
     }
 
     fun stop() {

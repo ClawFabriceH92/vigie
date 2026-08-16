@@ -115,9 +115,13 @@ object VigieRuntime {
     }
 
     private fun startServer() {
+        val port = settings.value.streamPort.coerceIn(1024, 65535)
+        val intercomPort = if (port + 1 <= 65535) port + 1 else port - 1
         server = MjpegServer(
+            port = port,
             userProvider = { settings.value.streamUser },
             passwordProvider = { settings.value.streamPassword },
+            intercomPortProvider = { if (settings.value.streamPort + 1 <= 65535) settings.value.streamPort + 1 else settings.value.streamPort - 1 },
         )
         try {
             server?.start(10_000, false)
@@ -126,7 +130,7 @@ object VigieRuntime {
             streamRunning.value = false
         }
         // Intercom : démarre indépendamment (ne bloque pas si le port est pris)
-        intercom = IntercomServer(appContext) { settings.value.streamPassword }
+        intercom = IntercomServer(appContext, { settings.value.streamPassword }, intercomPort)
         try {
             intercom?.start()
         } catch (_: Exception) {
@@ -235,10 +239,16 @@ object VigieRuntime {
     // ---------- Réglages ----------
 
     fun updateSettings(s: SettingsStore.Settings) {
+        val portChanged = s.streamPort != settings.value.streamPort
         settings.value = s
         settingsStore.save(s)
         if (s.trustEnabled) nextScanAt = 0L
         recomputeMode()
+        if (portChanged) {
+            // Redémarre les serveurs avec le nouveau port
+            stopServer()
+            startServer()
+        }
     }
 
     // ---------- Mise à jour ----------

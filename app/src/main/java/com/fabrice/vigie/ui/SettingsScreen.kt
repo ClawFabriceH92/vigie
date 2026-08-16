@@ -200,6 +200,31 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
 
         SectionCard("Accès à distance (flux + intercom)") {
             OutlinedTextField(
+                value = settings.streamPort.toString(),
+                onValueChange = { input ->
+                    val port = input.filter { it.isDigit() }.take(5).toIntOrNull()
+                    if (port != null && port in 1024..65535) {
+                        vm.updateSettings(settings.copy(streamPort = port))
+                    }
+                },
+                label = { Text("Port du serveur (flux + contrôle)") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                trailingIcon = {
+                    TextButton(onClick = {
+                        val newPort = (1024..65535).random()
+                        vm.updateSettings(settings.copy(streamPort = newPort))
+                    }) { Text("🎲 Aléatoire") }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "Intercom sur le port suivant (${if (settings.streamPort + 1 <= 65535) settings.streamPort + 1 else settings.streamPort - 1}). Redémarrage automatique des serveurs au changement.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
                 value = settings.streamUser,
                 onValueChange = { vm.updateSettings(settings.copy(streamUser = it)) },
                 label = { Text("Utilisateur") },

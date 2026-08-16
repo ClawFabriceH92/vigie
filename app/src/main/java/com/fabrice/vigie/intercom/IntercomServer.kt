@@ -28,7 +28,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 class IntercomServer(
     private val context: Context,
     private val tokenProvider: () -> String,
-) : NanoWSD(PORT) {
+    private val port: Int,
+) : NanoWSD(port) {
 
     private val clients = CopyOnWriteArrayList<IntercomSocket>()
     private val recordActive = AtomicBoolean(false)
@@ -37,7 +38,6 @@ class IntercomServer(
     private var recordThread: Thread? = null
 
     companion object {
-        const val PORT = 8081
         private const val SAMPLE_RATE = 16000
         private const val TAG = "VigieIntercom"
     }

@@ -26,6 +26,7 @@ class SettingsStore(context: Context) {
         val streamUser: String = "vigie",     // nom d'utilisateur pour l'accès distant
         val jpegQuality: Int = 80,            // qualité du flux MJPEG (50..95)
         val analysisHeight: Int = 480,        // hauteur d'analyse/flux (480 ou 720)
+        val streamPort: Int = 8080,           // port du serveur HTTP (flux + contrôle)
     )
 
     fun load(): Settings = Settings(
@@ -43,6 +44,7 @@ class SettingsStore(context: Context) {
         streamUser = prefs.getString("stream_user", "vigie") ?: "vigie",
         jpegQuality = prefs.getInt("jpeg_quality", 80),
         analysisHeight = prefs.getInt("analysis_height", 480),
+        streamPort = prefs.getInt("stream_port", 8080),
     )
 
     fun save(s: Settings) {
@@ -61,6 +63,7 @@ class SettingsStore(context: Context) {
             .putString("stream_user", s.streamUser)
             .putInt("jpeg_quality", s.jpegQuality)
             .putInt("analysis_height", s.analysisHeight)
+            .putInt("stream_port", s.streamPort)
             .apply()
     }
 }

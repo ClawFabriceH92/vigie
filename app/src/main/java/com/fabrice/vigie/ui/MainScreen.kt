@@ -245,7 +245,7 @@ private fun HomeOverlay(vm: SurveillanceViewModel) {
             }
             Spacer(Modifier.height(10.dp))
             Text(
-                text = if (streamRunning) "Flux : http://${localIp ?: "?"}:8080/stream · Intercom : :8081" else "Flux indisponible",
+                text = if (streamRunning) "Flux : http://${localIp ?: "?"}:${vm.settings.value.streamPort}/stream · Intercom : :${if (vm.settings.value.streamPort + 1 <= 65535) vm.settings.value.streamPort + 1 else vm.settings.value.streamPort - 1}" else "Flux indisponible",
                 style = MaterialTheme.typography.labelMedium,
                 color = Color(0xFFB8C7DA),
             )

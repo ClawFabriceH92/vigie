@@ -18,12 +18,13 @@ import java.util.concurrent.CopyOnWriteArrayList
  * Alimenté par [publish] depuis le pipeline caméra.
  */
 class MjpegServer(
+    private val port: Int,
     private val userProvider: () -> String,
     private val passwordProvider: () -> String,
-) : NanoHTTPD(PORT) {
+    private val intercomPortProvider: () -> Int,
+) : NanoHTTPD(port) {
 
     companion object {
-        const val PORT = 8080
         private const val BOUNDARY = "frame"
     }
 
@@ -184,7 +185,8 @@ class MjpegServer(
               <p class="status" id="status">Connexion intercom…</p>
               <script>
                 const TOKEN = ${jsonToken()};
-                const WS_URL = "ws://" + location.hostname + ":8081/?token=" + encodeURIComponent(TOKEN);
+                const WS_PORT = ${intercomPortProvider()};
+                const WS_URL = "ws://" + location.hostname + ":" + WS_PORT + "/?token=" + encodeURIComponent(TOKEN);
                 const SAMPLE_RATE = 16000;
                 let ws = null;
                 let ctx = null;
