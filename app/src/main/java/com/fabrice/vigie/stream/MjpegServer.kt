@@ -57,15 +57,20 @@ class MjpegServer(
             resp.addHeader("WWW-Authenticate", "Basic realm=\"Vigie\"")
             return resp
         }
-        return when (session.uri) {
-            "/", "/index.html" -> pageResponse()
+        // Normalise l'URI : ignore le slash final et la query (ex: /stream/, /stream?t=1)
+        val uri = session.uri.trimEnd('/').substringBefore('?')
+        return when (uri) {
+            "", "/index.html" -> pageResponse()
             "/stream" -> streamResponse()
             "/snapshot" -> snapshotResponse()
             "/video/start" -> videoStartResponse()
             "/video/stop" -> videoStopResponse()
             "/video/list" -> videoListResponse()
             "/video/download" -> videoDownloadResponse(session)
-            else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "404")
+            else -> {
+                android.util.Log.w("VigieHttp", "404 sur ${session.method}:${session.uri}")
+                newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "404 — page introuvable")
+            }
         }
     }
 

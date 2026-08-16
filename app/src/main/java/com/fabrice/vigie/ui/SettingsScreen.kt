@@ -26,14 +26,17 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
@@ -57,6 +60,16 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
     val updateState by vm.updateState.collectAsStateWithLifecycle()
     var showPinDialog by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
+    var showRemotePassword by remember { mutableStateOf(false) }
+    var passwordJustChanged by remember { mutableStateOf(false) }
+
+    // Message temporaire « mot de passe changé »
+    LaunchedEffect(passwordJustChanged) {
+        if (passwordJustChanged) {
+            delay(4000)
+            passwordJustChanged = false
+        }
+    }
 
     Column(
         Modifier
@@ -202,7 +215,7 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
                 onValueChange = { vm.updateSettings(settings.copy(streamPassword = it)) },
                 label = { Text("Mot de passe") },
                 singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (showRemotePassword) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 isError = !PinHasher.isStrong(settings.streamPassword),
                 supportingText = {
@@ -216,12 +229,27 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
                     )
                 },
                 trailingIcon = {
-                    TextButton(onClick = {
-                        vm.updateSettings(settings.copy(streamPassword = SecureGenerator.password()))
-                    }) { Text("🎲 Aléatoire") }
+                    Row {
+                        TextButton(onClick = { showRemotePassword = !showRemotePassword }) {
+                            Text(if (showRemotePassword) "🙈" else "👁")
+                        }
+                        TextButton(onClick = {
+                            vm.updateSettings(settings.copy(streamPassword = SecureGenerator.password()))
+                            showRemotePassword = true
+                            passwordJustChanged = true
+                        }) { Text("🎲 Aléatoire") }
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
+            if (passwordJustChanged) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "✅ Nouveau mot de passe généré et enregistré — note-le, il est affiché ci-dessus",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TrustGreen,
+                )
+            }
             Text(
                 "Sans caractères ambigus (O/0, I/l/1…) — lisibles et recopiables. Utilisateur et mot de passe protègent le flux (port 8080) et l'intercom (port 8081).",
                 style = MaterialTheme.typography.bodyMedium,
