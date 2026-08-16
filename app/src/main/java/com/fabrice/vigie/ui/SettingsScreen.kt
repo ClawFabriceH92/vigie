@@ -541,6 +541,29 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
                     )
                 }
                 Spacer(Modifier.height(8.dp))
+                var showSmtpHelp by remember { mutableStateOf(false) }
+                TextButton(onClick = { showSmtpHelp = !showSmtpHelp }) {
+                    Text(if (showSmtpHelp) "▲ Masquer le tutoriel" else "❓ Comment créer un mot de passe d'application ?")
+                }
+                if (showSmtpHelp) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text("📧 Tutoriel — mot de passe d'application (Gmail)", style = MaterialTheme.typography.titleSmall, color = Amber)
+                            Spacer(Modifier.height(6.dp))
+                            Text("1. Sur ton ordinateur ou téléphone : ouvre ton compte Google (myaccount.google.com)", style = MaterialTheme.typography.bodyMedium)
+                            Text("2. Menu « Sécurité » → active « Validation en 2 étapes » si ce n'est pas déjà fait", style = MaterialTheme.typography.bodyMedium)
+                            Text("3. Toujours dans Sécurité, cherche « Mots de passe des applications » (recherche rapide : tape « mot de passe d'application »)", style = MaterialTheme.typography.bodyMedium)
+                            Text("4. Clique « Créer un mot de passe d'application », nomme-le « Vigie »", style = MaterialTheme.typography.bodyMedium)
+                            Text("5. Google affiche un mot de passe de 16 caractères — copie-le dans le champ « Mot de passe SMTP » ci-dessus", style = MaterialTheme.typography.bodyMedium)
+                            Spacer(Modifier.height(6.dp))
+                            Text("⚠️ Utilise TOUJOURS ce mot de passe d'application (16 car.), jamais ton mot de passe Gmail normal. Il est révocable à tout moment depuis ton compte.", style = MaterialTheme.typography.bodySmall, color = AlertRed)
+                        }
+                    }
+                }
                 var testResult by remember { mutableStateOf<String?>(null) }
                 Button(
                     onClick = {
