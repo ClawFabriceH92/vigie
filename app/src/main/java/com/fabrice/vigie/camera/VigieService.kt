@@ -91,6 +91,20 @@ class VigieService : LifecycleService() {
         CameraBridge.torchRequested = { on -> engine?.setTorch(on) ?: false }
         CameraBridge.zoomRequested = { factor -> engine?.zoomBy(factor) ?: false }
         CameraBridge.zoomResetRequested = { engine?.resetZoom() ?: false }
+        CameraBridge.sirenStartRequested = {
+            com.fabrice.vigie.siren.SirenPlayer.start(this)
+            true
+        }
+        CameraBridge.sirenStopRequested = {
+            com.fabrice.vigie.siren.SirenPlayer.stop()
+            true
+        }
+        CameraBridge.photosClearRequested = {
+            com.fabrice.vigie.VigieRuntime.deleteAllEvents()
+        }
+        CameraBridge.videosClearRequested = {
+            com.fabrice.vigie.VigieRuntime.deleteAllVideos()
+        }
         CameraBridge.statusProvider = {
             val battery = com.fabrice.vigie.power.PowerMonitorReceiver.batteryLevel(this)
             val res = if (VigieRuntime.settings.value.analysisHeight >= 720) "1280×720" else "640×480"
@@ -125,6 +139,10 @@ class VigieService : LifecycleService() {
         CameraBridge.torchRequested = null
         CameraBridge.zoomRequested = null
         CameraBridge.zoomResetRequested = null
+        CameraBridge.sirenStartRequested = null
+        CameraBridge.sirenStopRequested = null
+        CameraBridge.photosClearRequested = null
+        CameraBridge.videosClearRequested = null
         CameraBridge.statusProvider = null
         engine?.stop()
         engine = null

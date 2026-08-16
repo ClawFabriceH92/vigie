@@ -83,6 +83,12 @@ class MjpegServer(
             "/photos" -> photosResponse()
             "/photo" -> photoResponse(session)
             "/photo/delete" -> photoDeleteResponse(session)
+            "/photos/json" -> photosJsonResponse()
+            "/photos/clear" -> photosClearResponse()
+            "/videos/json" -> videosJsonResponse()
+            "/videos/clear" -> videosClearResponse()
+            "/siren/on" -> sirenResponse(true)
+            "/siren/off" -> sirenResponse(false)
             "/torch/on" -> torchResponse(true)
             "/torch/off" -> torchResponse(false)
             "/zoom/in" -> zoomResponse(1.4f)
@@ -96,7 +102,7 @@ class MjpegServer(
         }
     }
 
-    // ---------- Flash / Zoom à distance ----------
+    // ---------- Flash / Zoom / Sirène à distance ----------
 
     private fun torchResponse(on: Boolean): Response {
         val ok = CameraBridge.torchRequested?.invoke(on) ?: false
@@ -104,6 +110,19 @@ class MjpegServer(
             if (ok) Response.Status.OK else Response.Status.SERVICE_UNAVAILABLE,
             "text/plain; charset=utf-8",
             if (ok) (if (on) "Flash allumé" else "Flash éteint") else "Flash indisponible",
+        )
+    }
+
+    private fun sirenResponse(on: Boolean): Response {
+        val ok = if (on) {
+            CameraBridge.sirenStartRequested?.invoke() ?: false
+        } else {
+            CameraBridge.sirenStopRequested?.invoke() ?: false
+        }
+        return newFixedLengthResponse(
+            if (ok) Response.Status.OK else Response.Status.SERVICE_UNAVAILABLE,
+            "text/plain; charset=utf-8",
+            if (ok) (if (on) "Sirène activée" else "Sirène arrêtée") else "Sirène indisponible",
         )
     }
 
@@ -131,6 +150,60 @@ class MjpegServer(
     }
 
     // ---------- Photos (visualisation / suppression à distance) ----------
+
+    private fun photosJsonResponse(): Response {
+        val photos = CameraBridge.photosListProvider?.invoke() ?: emptyList()
+        val sb = StringBuilder("[")
+        for ((i, p) in photos.withIndex()) {
+            if (i > 0) sb.append(",")
+            val (eventId, name, ts) = p
+            sb.append("{\"event\":\"${jsonEsc(eventId)}\",\"name\":\"${jsonEsc(name)}\",\"ts\":$ts,")
+            sb.append("\"url\":\"/photo?event=${java.net.URLEncoder.encode(eventId, "UTF-8")}&name=${java.net.URLEncoder.encode(name, "UTF-8")}\"}")
+        }
+        sb.append("]")
+        val resp = newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", sb.toString())
+        resp.addHeader("Cache-Control", "no-cache")
+        return resp
+    }
+
+    private fun photosClearResponse(): Response {
+        val n = CameraBridge.photosClearRequested?.invoke() ?: 0
+        return newFixedLengthResponse(Response.Status.OK, "text/plain; charset=utf-8", "Photos supprimées : $n")
+    }
+
+    private fun videosJsonResponse(): Response {
+        val videos = CameraBridge.videoListProvider?.invoke() ?: emptyList()
+        val sb = StringBuilder("[")
+        for ((i, v) in videos.withIndex()) {
+            if (i > 0) sb.append(",")
+            val (name, size) = v
+            sb.append("{\"name\":\"${jsonEsc(name)}\",\"size\":$size,\"url\":\"/video/download?name=${java.net.URLEncoder.encode(name, "UTF-8")}\"}")
+        }
+        sb.append("]")
+        val resp = newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", sb.toString())
+        resp.addHeader("Cache-Control", "no-cache")
+        return resp
+    }
+
+    private fun videosClearResponse(): Response {
+        val n = CameraBridge.videosClearRequested?.invoke() ?: 0
+        return newFixedLengthResponse(Response.Status.OK, "text/plain; charset=utf-8", "Vidéos supprimées : $n")
+    }
+
+    private fun jsonEsc(s: String): String {
+        val sb = StringBuilder()
+        for (c in s) {
+            when (c) {
+                '\\' -> sb.append("\\\\")
+                '"' -> sb.append("\\\"")
+                '\n' -> sb.append("\\n")
+                '\r' -> sb.append("\\r")
+                '\t' -> sb.append("\\t")
+                else -> sb.append(c)
+            }
+        }
+        return sb.toString()
+    }
 
     private fun photosResponse(): Response {
         val photos = CameraBridge.photosListProvider?.invoke() ?: emptyList()
@@ -273,8 +346,8 @@ class MjpegServer(
                 body { background:linear-gradient(160deg, var(--bg) 0%, var(--bg2) 100%); color:var(--cream); font-family:'Segoe UI',system-ui,sans-serif; margin:0; display:flex; flex-direction:column; align-items:center; padding:16px; min-height:100vh; }
                 h1 { color:var(--gold); margin:10px 0 4px; font-size:24px; letter-spacing:.5px; text-shadow:0 2px 8px rgba(0,0,0,.4); }
                 .menu { display:flex; gap:8px; margin:14px 0; flex-wrap:wrap; justify-content:center; }
-                .menu a { background:rgba(255,255,255,.07); color:var(--gold2); text-decoration:none; padding:9px 16px; border-radius:12px; font-size:14px; font-weight:600; border:1px solid rgba(255,255,255,.08); transition:all .15s; backdrop-filter:blur(4px); }
-                .menu a:hover { background:rgba(255,255,255,.14); transform:translateY(-1px); }
+                .menu a, .menubtn { background:rgba(255,255,255,.07); color:var(--gold2); text-decoration:none; padding:9px 16px; border-radius:12px; font-size:14px; font-weight:600; border:1px solid rgba(255,255,255,.08); transition:all .15s; backdrop-filter:blur(4px); cursor:pointer; }
+                .menu a:hover, .menubtn:hover { background:rgba(255,255,255,.14); transform:translateY(-1px); }
                 .menu a.active { background:linear-gradient(135deg, var(--gold), var(--gold2)); color:var(--bg); border-color:transparent; box-shadow:0 4px 14px rgba(201,151,43,.35); }
                 .stream-wrap { background:#000; border-radius:16px; padding:6px; box-shadow:0 10px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.06); max-width:100%; }
                 img { max-width:100%; height:auto; border-radius:12px; display:block; }
@@ -293,14 +366,22 @@ class MjpegServer(
                 .infobar .b-low { color:#E57373; }
                 .flash-ind { display:inline-block; width:10px; height:10px; border-radius:50%; background:#555; margin-right:6px; vertical-align:middle; }
                 .flash-ind.on { background:#FFD54F; box-shadow:0 0 8px #FFD54F; }
+                .panel { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:16px; margin-top:16px; width:94%; max-width:900px; }
+                .panel h2 { color:var(--gold); margin:0 0 10px; font-size:18px; }
+                .hidden { display:none; }
+                .panel .thumb { width:120px; height:90px; object-fit:cover; border-radius:8px; border:1px solid rgba(255,255,255,.15); }
+                .panel .row { display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,.06); flex-wrap:wrap; }
+                .panel .row .meta { flex:1; font-size:13px; color:var(--muted); }
+                .panel a.dl { color:var(--gold2); font-weight:600; text-decoration:none; }
+                button.danger { background:linear-gradient(135deg, #B71C1C, var(--red)); color:#fff; margin-top:12px; }
               </style>
             </head>
             <body>
               <h1>👁 Vigie — contrôle à distance</h1>
               <div class="menu">
                 <a href="/" class="active">📺 Flux</a>
-                <a href="/video/list">🎥 Vidéos</a>
-                <a href="/photos">📷 Photos</a>
+                <button class="menubtn" id="navVideos">🎥 Vidéos</button>
+                <button class="menubtn" id="navPhotos">📷 Photos</button>
                 <a href="/snapshot" target="_blank">📸 Photo</a>
               </div>
               <div class="stream-wrap">
@@ -313,10 +394,21 @@ class MjpegServer(
                 <button id="flashBtn">⚡ Flash</button>
                 <button id="zoomInBtn">🔍 Zoom +</button>
                 <button id="zoomOutBtn">🔍 Zoom −</button>
+                <button id="sirenBtn">🚨 Sirène</button>
                 <button id="talkBtn" class="off" disabled>🔇 Parler</button>
                 <button id="listenBtn" class="off" disabled>🔈 Écouter</button>
               </div>
               <p class="status" id="status">Connexion intercom…</p>
+              <div id="videosPanel" class="panel hidden">
+                <h2>🎥 Vidéos enregistrées</h2>
+                <div id="videosList"></div>
+                <button id="clearVideos" class="danger">🗑 Supprimer toutes les vidéos</button>
+              </div>
+              <div id="photosPanel" class="panel hidden">
+                <h2>📷 Photos des événements</h2>
+                <div id="photosList"></div>
+                <button id="clearPhotos" class="danger">🗑 Supprimer toutes les photos</button>
+              </div>
               <script>
                 const TOKEN = ${jsonToken()};
                 const WS_PORT = ${intercomPortProvider()};
@@ -366,6 +458,96 @@ class MjpegServer(
                   }
                 }
                 flashBtn.addEventListener("click", toggleFlash);
+
+                // ---- Sirène à distance ----
+                let sirenOn = false;
+                const sirenBtn = document.getElementById("sirenBtn");
+                sirenBtn.addEventListener("click", async () => {
+                  sirenBtn.disabled = true;
+                  try {
+                    const r = await fetch(sirenOn ? "/siren/off" : "/siren/on");
+                    if (r.ok) {
+                      sirenOn = !sirenOn;
+                      if (sirenOn) {
+                        sirenBtn.textContent = "🚨 Sirène ON";
+                        sirenBtn.classList.add("rec");
+                        setStatus("🚨 Sirène activée");
+                      } else {
+                        sirenBtn.textContent = "🚨 Sirène";
+                        sirenBtn.classList.remove("rec");
+                        setStatus("Sirène arrêtée");
+                      }
+                    }
+                  } catch (e) {
+                    setStatus("⚠ Erreur sirène", true);
+                  } finally {
+                    sirenBtn.disabled = false;
+                  }
+                });
+
+                // ---- Panneaux vidéos / photos (sans quitter la page) ----
+                const videosPanel = document.getElementById("videosPanel");
+                const photosPanel = document.getElementById("photosPanel");
+                const navVideos = document.getElementById("navVideos");
+                const navPhotos = document.getElementById("navPhotos");
+
+                function fmtSize(bytes) {
+                  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + " Mo";
+                  if (bytes >= 1024) return (bytes / 1024).toFixed(0) + " Ko";
+                  return bytes + " o";
+                }
+                function fmtDate(ts) {
+                  const d = new Date(ts);
+                  return d.toLocaleDateString("fr-FR") + " " + d.toLocaleTimeString("fr-FR", {hour: "2-digit", minute: "2-digit"});
+                }
+
+                async function loadVideos() {
+                  try {
+                    const r = await fetch("/videos/json");
+                    const videos = await r.json();
+                    const el = document.getElementById("videosList");
+                    if (videos.length === 0) { el.innerHTML = "<p>Aucune vidéo.</p>"; return; }
+                    el.innerHTML = videos.map(v =>
+                      "<div class='row'><span class='meta'>🎥 " + v.name + " — " + fmtSize(v.size) + "</span>" +
+                      "<a class='dl' href='" + v.url + "'>⬇ Télécharger</a></div>"
+                    ).join("");
+                  } catch (e) { document.getElementById("videosList").innerHTML = "<p>Erreur chargement.</p>"; }
+                }
+
+                async function loadPhotos() {
+                  try {
+                    const r = await fetch("/photos/json");
+                    const photos = await r.json();
+                    const el = document.getElementById("photosList");
+                    if (photos.length === 0) { el.innerHTML = "<p>Aucune photo.</p>"; return; }
+                    el.innerHTML = photos.map(p =>
+                      "<div class='row'><img class='thumb' src='" + p.url + "' loading='lazy'>" +
+                      "<span class='meta'>📷 " + fmtDate(p.ts) + "</span>" +
+                      "<a class='dl' href='" + p.url + "' target='_blank'>🔍 Ouvrir</a>" +
+                      "<a class='dl' href='/photo/delete?event=" + encodeURIComponent(p.event) + "&name=" + encodeURIComponent(p.name) + "' onclick='return confirm(\"Supprimer cette photo ?\")'>🗑</a></div>"
+                    ).join("");
+                  } catch (e) { document.getElementById("photosList").innerHTML = "<p>Erreur chargement.</p>"; }
+                }
+
+                navVideos.addEventListener("click", () => {
+                  videosPanel.classList.toggle("hidden");
+                  if (!videosPanel.classList.contains("hidden")) loadVideos();
+                });
+                navPhotos.addEventListener("click", () => {
+                  photosPanel.classList.toggle("hidden");
+                  if (!photosPanel.classList.contains("hidden")) loadPhotos();
+                });
+
+                document.getElementById("clearVideos").addEventListener("click", async () => {
+                  if (!confirm("Supprimer TOUTES les vidéos ? Action irréversible.")) return;
+                  await fetch("/videos/clear");
+                  loadVideos();
+                });
+                document.getElementById("clearPhotos").addEventListener("click", async () => {
+                  if (!confirm("Supprimer TOUTES les photos ? Action irréversible.")) return;
+                  await fetch("/photos/clear");
+                  loadPhotos();
+                });
 
                 // ---- Statut périodique (batterie / résolution / clients) ----
                 async function refreshStatus() {
@@ -425,12 +607,12 @@ class MjpegServer(
                   talkBtn.disabled = false; listenBtn.disabled = false;
                   talkBtn.classList.remove("off"); listenBtn.classList.remove("off");
                 };
-                ws.onclose = () => {
-                  setStatus("❌ Intercom déconnecté", true);
+                ws.onclose = (ev) => {
+                  setStatus("❌ Intercom déconnecté (" + (ev.code || "?") + ")", true);
                   talkBtn.disabled = true; listenBtn.disabled = true;
                   talkBtn.classList.add("off"); listenBtn.classList.add("off");
                 };
-                ws.onerror = () => setStatus("⚠ Erreur WebSocket", true);
+                ws.onerror = () => setStatus("⚠ Erreur WebSocket — vérifiez le port intercom (Diagnostic)", true);
                 ws.onmessage = (ev) => {
                   if (!listenBtn.classList.contains("listening")) return;
                   const data = new Int16Array(ev.data);
@@ -513,8 +695,11 @@ class MjpegServer(
 
     private fun jsonToken(): String {
         val token = passwordProvider()
+        // Encodage Base64URL (pas de caractères réservés dans une URL/query string)
+        val b64 = android.util.Base64.encodeToString(token.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
+        val urlSafe = b64.replace('+', '-').replace('/', '_').trimEnd('=')
         val sb = StringBuilder("\"")
-        for (c in token) {
+        for (c in urlSafe) {
             when (c) {
                 '\\' -> sb.append("\\\\")
                 '"' -> sb.append("\\\"")

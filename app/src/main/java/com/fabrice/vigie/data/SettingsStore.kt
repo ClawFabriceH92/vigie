@@ -32,6 +32,7 @@ class SettingsStore(context: Context) {
         val motionCaptureMode: String = "photos", // "photos" (rafale) ou "video" (MP4 + son)
         val motionVideoDurationSec: Int = 15, // durée d'enregistrement vidéo sur mouvement (s)
         val photoTimestamp: Boolean = true,   // horodatage en surimpression sur les photos
+        val retentionDays: Int = 0,           // 0 = garder indéfiniment ; sinon purge après X jours
     )
 
     fun load(): Settings = Settings(
@@ -55,6 +56,7 @@ class SettingsStore(context: Context) {
         motionCaptureMode = prefs.getString("motion_capture_mode", "photos") ?: "photos",
         motionVideoDurationSec = prefs.getInt("motion_video_duration_sec", 15),
         photoTimestamp = prefs.getBoolean("photo_timestamp", true),
+        retentionDays = prefs.getInt("retention_days", 0),
     )
 
     fun save(s: Settings) {
@@ -79,6 +81,7 @@ class SettingsStore(context: Context) {
             .putString("motion_capture_mode", s.motionCaptureMode)
             .putInt("motion_video_duration_sec", s.motionVideoDurationSec)
             .putBoolean("photo_timestamp", s.photoTimestamp)
+            .putInt("retention_days", s.retentionDays)
             .apply()
     }
 }

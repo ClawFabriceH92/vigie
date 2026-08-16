@@ -151,13 +151,31 @@ class IntercomServer(
         return IntercomSocket(handshake, token)
     }
 
+    private fun tokenMatches(raw: String): Boolean {
+        val expected = tokenProvider()
+        if (raw == expected) return true
+        // Accepte aussi le format Base64URL utilisé par la page web
+        return try {
+            val b64 = raw.replace('-', '+').replace('_', '/')
+            val pad = (4 - b64.length % 4) % 4
+            val decoded = String(
+                android.util.Base64.decode(b64 + "=".repeat(pad), android.util.Base64.DEFAULT),
+                Charsets.UTF_8,
+            )
+            decoded == expected
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private inner class IntercomSocket(
         handshake: NanoHTTPD.IHTTPSession,
         private val token: String,
     ) : NanoWSD.WebSocket(handshake) {
 
         override fun onOpen() {
-            if (token != tokenProvider()) {
+            if (!tokenMatches(token)) {
+                Log.w(TAG, "Token intercom invalide (longueur ${token.length})")
                 try {
                     close(NanoWSD.WebSocketFrame.CloseCode.PolicyViolation, "token invalide", false)
                 } catch (_: Exception) {

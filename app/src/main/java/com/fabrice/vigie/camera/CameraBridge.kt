@@ -26,6 +26,12 @@ object CameraBridge {
     @Volatile var torchRequested: ((Boolean) -> Boolean)? = null
     @Volatile var zoomRequested: ((Float) -> Boolean)? = null
     @Volatile var zoomResetRequested: (() -> Boolean)? = null
+    // Sirène à distance
+    @Volatile var sirenStartRequested: (() -> Boolean)? = null
+    @Volatile var sirenStopRequested: (() -> Boolean)? = null
+    // Suppression de masse
+    @Volatile var photosClearRequested: (() -> Int)? = null
+    @Volatile var videosClearRequested: (() -> Int)? = null
     // Statut pour la page web (batterie, résolution, état)
     @Volatile var statusProvider: (() -> String)? = null
 }

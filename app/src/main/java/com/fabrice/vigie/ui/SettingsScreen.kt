@@ -215,6 +215,16 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
             )
         }
 
+        SectionCard("Stockage (rétention auto)") {
+            Stepper("Supprimer après", settings.retentionDays, "jour(s) — 0 = jamais", 0, 90, 1) { vm.updateSettings(settings.copy(retentionDays = it)) }
+            Text(
+                if (settings.retentionDays > 0) "Les photos et vidéos de plus de ${settings.retentionDays} jours seront supprimées automatiquement (au lancement + chaque nuit à 3h)."
+                else "Les photos et vidéos sont conservées indéfiniment. Règle un nombre de jours pour purger automatiquement.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         SectionCard("Écran & batterie") {
             Text("Extinction de l'écran : ${if (settings.screenTimeoutMin == 0) "jamais (toujours allumé)" else "après ${settings.screenTimeoutMin} min sans toucher"}", style = MaterialTheme.typography.titleMedium)
             Slider(

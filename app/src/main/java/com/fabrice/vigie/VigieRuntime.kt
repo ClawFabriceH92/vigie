@@ -303,6 +303,8 @@ object VigieRuntime {
         s.launch {
             // Vérification immédiate au lancement
             if (settings.value.autoUpdate) checkForUpdates()
+            // Purge des anciennes photos/vidéos (rétention) au lancement
+            pruneOlderThan(settings.value.retentionDays)
             while (isActive) {
                 val now = java.util.Calendar.getInstance()
                 val hour = now.get(java.util.Calendar.HOUR_OF_DAY)
@@ -314,6 +316,11 @@ object VigieRuntime {
                 } else {
                     // toutes les 30 s on surveille l'heure (léger) ; vérif réseau toutes les 6 h en secours
                     delay(30_000)
+                }
+                // Purge quotidienne (après minuit)
+                if (hour == 3 && minute == 0) {
+                    pruneOlderThan(settings.value.retentionDays)
+                    delay(61_000)
                 }
             }
         }
@@ -443,6 +450,38 @@ object VigieRuntime {
         }
     }
 
+    // ---------- Suppression / rétention ----------
+
+    /** Supprime tous les événements (photos). Retourne le nombre supprimé. */
+    fun deleteAllEvents(): Int {
+        val events = eventStore.listEvents()
+        val n = events.size
+        events.forEach { eventStore.deleteEvent(it.id) }
+        refreshStats()
+        return n
+    }
+
+    /** Supprime toutes les vidéos. Retourne le nombre supprimé. */
+    fun deleteAllVideos(): Int {
+        val dir = File(appContext.filesDir, "videos")
+        val files = dir.listFiles()?.filter { it.extension == "mp4" } ?: emptyList()
+        val n = files.size
+        files.forEach { it.delete() }
+        return n
+    }
+
+    /** Purge les photos et vidéos plus vieux que [days] jours. */
+    fun pruneOlderThan(days: Int) {
+        if (days <= 0) return
+        val maxAgeMs = days * 86_400_000L
+        eventStore.pruneOlderThan(maxAgeMs)
+        val now = System.currentTimeMillis()
+        File(appContext.filesDir, "videos").listFiles()
+            ?.filter { it.extension == "mp4" && now - it.lastModified() > maxAgeMs }
+            ?.forEach { it.delete() }
+        refreshStats()
+    }
+
     // ---------- Mode / confiance ----------
 
     fun setManualMode(armed: Boolean) {
@@ -567,11 +606,6 @@ object VigieRuntime {
 
     fun deleteEvent(eventId: String) {
         eventStore.deleteEvent(eventId)
-        refreshStats()
-    }
-
-    fun deleteAllEvents() {
-        eventStore.eventsDir().listFiles()?.forEach { it.deleteRecursively() }
         refreshStats()
     }
 
