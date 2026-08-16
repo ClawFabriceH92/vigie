@@ -583,9 +583,20 @@ object VigieRuntime {
         pendingPhotos++
         if (pendingPhotos >= settings.value.burstCount) {
             burstActive.value = false
+            val dir = burstTargetDir.value
             burstTargetDir.value = null
             pendingPhotos = 0
             refreshStats()
+            // Envoi automatique par email si activé
+            if (settings.value.autoEmail && dir != null) {
+                val photos = dir.listFiles()?.filter { it.extension == "jpg" }?.sorted() ?: emptyList()
+                if (photos.isNotEmpty()) {
+                    val s = settings.value
+                    scope?.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        com.fabrice.vigie.email.EmailSender.sendEventPhotos(s, photos, "Mouvement détecté")
+                    }
+                }
+            }
         }
     }
 

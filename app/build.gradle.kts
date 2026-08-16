@@ -15,8 +15,17 @@ android {
         applicationId = "com.fabrice.vigie"
         minSdk = 29
         targetSdk = 35
-        versionCode = 18
-        versionName = "0.7.8"
+        versionCode = 19
+        versionName = "0.7.9"
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/NOTICE.md"
+            excludes += "META-INF/LICENSE.md"
+            excludes += "META-INF/DEPENDENCIES"
+        }
     }
 
     signingConfigs {
@@ -91,6 +100,8 @@ dependencies {
     // Serveur MJPEG embarqué
     implementation("org.nanohttpd:nanohttpd:2.3.1")
     implementation("org.nanohttpd:nanohttpd-websocket:2.3.1")
+    implementation("com.sun.mail:android-mail:1.6.7")
+    implementation("com.sun.mail:android-activation:1.6.7")
 
     testImplementation("junit:junit:4.13.2")
     // org.json d'Android est mocké en test unitaire local — on le remplace par la vraie implémentation

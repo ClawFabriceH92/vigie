@@ -33,6 +33,12 @@ class SettingsStore(context: Context) {
         val motionVideoDurationSec: Int = 15, // durée d'enregistrement vidéo sur mouvement (s)
         val photoTimestamp: Boolean = true,   // horodatage en surimpression sur les photos
         val retentionDays: Int = 0,           // 0 = garder indéfiniment ; sinon purge après X jours
+        val autoEmail: Boolean = false,       // envoi auto des photos par email après un événement
+        val smtpHost: String = "",
+        val smtpPort: Int = 587,
+        val smtpUser: String = "",
+        val smtpPassword: String = "",
+        val smtpSsl: Boolean = true,
     )
 
     fun load(): Settings = Settings(
@@ -57,6 +63,12 @@ class SettingsStore(context: Context) {
         motionVideoDurationSec = prefs.getInt("motion_video_duration_sec", 15),
         photoTimestamp = prefs.getBoolean("photo_timestamp", true),
         retentionDays = prefs.getInt("retention_days", 0),
+        autoEmail = prefs.getBoolean("auto_email", false),
+        smtpHost = prefs.getString("smtp_host", "") ?: "",
+        smtpPort = prefs.getInt("smtp_port", 587),
+        smtpUser = prefs.getString("smtp_user", "") ?: "",
+        smtpPassword = prefs.getString("smtp_password", "") ?: "",
+        smtpSsl = prefs.getBoolean("smtp_ssl", true),
     )
 
     fun save(s: Settings) {
@@ -82,6 +94,12 @@ class SettingsStore(context: Context) {
             .putInt("motion_video_duration_sec", s.motionVideoDurationSec)
             .putBoolean("photo_timestamp", s.photoTimestamp)
             .putInt("retention_days", s.retentionDays)
+            .putBoolean("auto_email", s.autoEmail)
+            .putString("smtp_host", s.smtpHost)
+            .putInt("smtp_port", s.smtpPort)
+            .putString("smtp_user", s.smtpUser)
+            .putString("smtp_password", s.smtpPassword)
+            .putBoolean("smtp_ssl", s.smtpSsl)
             .apply()
     }
 }

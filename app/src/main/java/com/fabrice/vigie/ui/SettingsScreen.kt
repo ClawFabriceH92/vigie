@@ -84,6 +84,7 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
         Text("⚙️ Réglages", style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(12.dp))
 
+        CategoryTitle("🔒 Sécurité")
         SectionCard("Sécurité") {
             Row(
                 Modifier.fillMaxWidth(),
@@ -102,6 +103,7 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
             }
         }
 
+        CategoryTitle("📷 Caméra & détection")
         SectionCard("Détection de mouvement") {
             Text("Sensibilité : ${settings.motionThreshold}", style = MaterialTheme.typography.titleMedium)
             Slider(
@@ -215,6 +217,7 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
             )
         }
 
+        CategoryTitle("💾 Stockage & batterie")
         SectionCard("Stockage (rétention auto)") {
             Stepper("Supprimer après", settings.retentionDays, "jour(s) — 0 = jamais", 0, 90, 1) { vm.updateSettings(settings.copy(retentionDays = it)) }
             Text(
@@ -317,6 +320,7 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
             )
         }
 
+        CategoryTitle("🛰 Accès à distance")
         SectionCard("Mode confiance (présence réseau)") {
             Row(
                 Modifier.fillMaxWidth(),
@@ -444,6 +448,7 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
             )
         }
 
+        CategoryTitle("📧 Email")
         SectionCard("Envoi de photos par email") {
             OutlinedTextField(
                 value = settings.emailRecipient,
@@ -460,6 +465,103 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
             )
         }
 
+        SectionCard("Envoi automatique (SMTP)") {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Envoi auto après un événement", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Envoie les photos par email dès qu'un mouvement est détecté (sans action manuelle).",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(
+                    checked = settings.autoEmail,
+                    onCheckedChange = { vm.updateSettings(settings.copy(autoEmail = it)) },
+                )
+            }
+            if (settings.autoEmail) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = settings.smtpHost,
+                    onValueChange = { vm.updateSettings(settings.copy(smtpHost = it)) },
+                    label = { Text("Serveur SMTP (ex: smtp.gmail.com)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = settings.smtpPort.toString(),
+                    onValueChange = { input ->
+                        val v = input.toIntOrNull()
+                        if (v != null && v in 1..65535) vm.updateSettings(settings.copy(smtpPort = v))
+                    },
+                    label = { Text("Port SMTP") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = settings.smtpUser,
+                    onValueChange = { vm.updateSettings(settings.copy(smtpUser = it)) },
+                    label = { Text("Utilisateur (adresse email)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = settings.smtpPassword,
+                    onValueChange = { vm.updateSettings(settings.copy(smtpPassword = it)) },
+                    label = { Text("Mot de passe SMTP (ou mot de passe d'application)") },
+                    singleLine = true,
+                    visualTransformation = if (showRemotePassword) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        TextButton(onClick = { showRemotePassword = !showRemotePassword }) {
+                            Text(if (showRemotePassword) "🙈" else "👁")
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Sécuriser la connexion (SSL)", style = MaterialTheme.typography.titleMedium)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked = settings.smtpSsl,
+                        onCheckedChange = { vm.updateSettings(settings.copy(smtpSsl = it)) },
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                var testResult by remember { mutableStateOf<String?>(null) }
+                Button(
+                    onClick = {
+                        val result = com.fabrice.vigie.email.EmailSender.sendTestEmail(settings)
+                        testResult = if (result) {
+                            "✅ Email de test envoyé à ${settings.emailRecipient.trim()}"
+                        } else {
+                            "❌ Échec — vérifie serveur, port, identifiants et destinataire"
+                        }
+                    },
+                ) {
+                    Text("📧 Tester la configuration")
+                }
+                testResult?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = if (it.startsWith("✅")) TrustGreen else AlertRed)
+                }
+            }
+        }
+
+        CategoryTitle("🔄 Application")
         SectionCard("Mise à jour") {
             Row(
                 Modifier.fillMaxWidth(),
@@ -618,6 +720,16 @@ private fun UpdateStatusRow(state: VigieRuntime.UpdateUiState) {
         text,
         style = MaterialTheme.typography.bodyMedium,
         color = color,
+    )
+}
+
+@Composable
+private fun CategoryTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium,
+        color = Amber,
+        modifier = Modifier.padding(top = 8.dp, bottom = 6.dp),
     )
 }
 
