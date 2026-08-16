@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +46,7 @@ import com.fabrice.vigie.SurveillanceMode
 import com.fabrice.vigie.SurveillanceViewModel
 import com.fabrice.vigie.ui.theme.AlertRed
 import com.fabrice.vigie.ui.theme.Amber
+import com.fabrice.vigie.ui.theme.Cream
 import com.fabrice.vigie.ui.theme.DeepNight
 import com.fabrice.vigie.ui.theme.NightBlue
 import com.fabrice.vigie.ui.theme.TrustGreen
@@ -105,15 +107,22 @@ private fun BottomNav(vm: SurveillanceViewModel, screen: Int, modifier: Modifier
     )
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = NightBlue.copy(alpha = 0.96f),
+        color = NightBlue,
     ) {
         NavigationBar(containerColor = Color.Transparent) {
             items.forEach { (idx, icon, label) ->
                 NavigationBarItem(
                     selected = screen == idx,
                     onClick = { vm.setScreen(idx) },
-                    icon = { Text(icon, fontSize = 20.sp) },
-                    label = { Text(label, fontSize = 11.sp) },
+                    icon = { Text(icon, fontSize = 22.sp) },
+                    label = { Text(label, fontSize = 12.sp) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color.White,
+                        selectedTextColor = Amber,
+                        indicatorColor = Amber.copy(alpha = 0.30f),
+                        unselectedIconColor = Cream,
+                        unselectedTextColor = Cream,
+                    ),
                 )
             }
         }

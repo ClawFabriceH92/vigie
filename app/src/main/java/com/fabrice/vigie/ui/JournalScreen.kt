@@ -33,8 +33,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,16 +65,7 @@ fun JournalScreen(vm: SurveillanceViewModel) {
             .background(MaterialTheme.colorScheme.background)
             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp),
     ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("📖 Journal des événements", style = MaterialTheme.typography.headlineSmall)
-            if (events.isNotEmpty()) {
-                TextButton(onClick = { confirmAll = true }) { Text("Tout supprimer", color = AlertRed) }
-            }
-        }
+        Text("📖 Journal des événements", style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(6.dp))
         Text(
             "$eventCount événement(s) — photos conservées localement",
@@ -82,7 +75,7 @@ fun JournalScreen(vm: SurveillanceViewModel) {
         Spacer(Modifier.height(12.dp))
 
         if (events.isEmpty()) {
-            Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().weight(1f).padding(top = 48.dp), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("🌙", fontSize = 48.sp)
                     Spacer(Modifier.height(8.dp))
@@ -94,9 +87,30 @@ fun JournalScreen(vm: SurveillanceViewModel) {
                 }
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f),
+            ) {
                 items(events, key = { it.id }) { event ->
                     EventRow(event) { selected = event }
+                }
+                item {
+                    Spacer(Modifier.height(12.dp))
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        color = AlertRed,
+                        onClick = { confirmAll = true },
+                    ) {
+                        Text(
+                            "🗑 Tout supprimer ($eventCount événement(s))",
+                            modifier = Modifier.padding(vertical = 14.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
             }
         }
@@ -109,14 +123,14 @@ fun JournalScreen(vm: SurveillanceViewModel) {
     if (confirmAll) {
         AlertDialog(
             onDismissRequest = { confirmAll = false },
-            title = { Text("Tout supprimer ?") },
-            text = { Text("Tous les événements et photos seront définitivement supprimés.") },
+            title = { Text("⚠️ Tout supprimer ?") },
+            text = { Text("Action irréversible. Tous les $eventCount événement(s) et leurs photos seront définitivement supprimés de cet appareil.") },
             confirmButton = {
                 TextButton(onClick = {
                     vm.deleteAllEvents()
                     confirmAll = false
                     refresh()
-                }) { Text("Supprimer", color = AlertRed) }
+                }) { Text("Tout supprimer", color = AlertRed) }
             },
             dismissButton = {
                 TextButton(onClick = { confirmAll = false }) { Text("Annuler") }

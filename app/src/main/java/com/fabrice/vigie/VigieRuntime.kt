@@ -1,8 +1,15 @@
 package com.fabrice.vigie
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.SystemClock
+import android.provider.Settings
+import androidx.core.app.NotificationCompat
 import com.fabrice.vigie.camera.CameraBridge
 import com.fabrice.vigie.data.EventStore
 import com.fabrice.vigie.data.SettingsStore
@@ -272,7 +279,47 @@ object VigieRuntime {
                 if (AutoUpdater.download(appContext, info.downloadUrl)) {
                     updateState.value = UpdateUiState(UpdateStatus.DOWNLOADING, info = info)
                 }
+            } else if (installIfAvailable) {
+                // Permission d'installation manquante → notifie pour que l'utilisateur l'accorde
+                notifyUpdatePermissionNeeded(info)
             }
+        }
+    }
+
+    /** Notification : une mise à jour est dispo mais il faut autoriser l'installation. */
+    private fun notifyUpdatePermissionNeeded(info: UpdateInfo) {
+        try {
+            val nm = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val channel = NotificationChannel(
+                "vigie_updates",
+                "Mises à jour",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = "Mises à jour automatiques de Vigie"
+            }
+            nm.createNotificationChannel(channel)
+
+            val settingsIntent = Intent(
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:${appContext.packageName}"),
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val pi = PendingIntent.getActivity(
+                appContext,
+                0,
+                settingsIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+
+            val notification = NotificationCompat.Builder(appContext, "vigie_updates")
+                .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                .setContentTitle("⬆ Mise à jour Vigie v${info.versionName} disponible")
+                .setContentText("Touchez pour autoriser l'installation, puis la mise à jour s'installera automatiquement.")
+                .setContentIntent(pi)
+                .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .build()
+            nm.notify(1, notification)
+        } catch (_: Exception) {
         }
     }
 
