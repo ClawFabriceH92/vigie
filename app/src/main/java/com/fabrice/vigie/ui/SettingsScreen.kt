@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -162,7 +163,7 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column {
+                Column(Modifier.weight(1f)) {
                     Text("Activer le mode confiance", style = MaterialTheme.typography.titleMedium)
                     Text(
                         "Désarmé quand un périphérique de confiance est sur le réseau",
@@ -170,6 +171,7 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                Spacer(Modifier.width(12.dp))
                 Switch(
                     checked = settings.trustEnabled,
                     onCheckedChange = { vm.updateSettings(settings.copy(trustEnabled = it)) },
@@ -279,7 +281,7 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column {
+                Column(Modifier.weight(1f)) {
                     Text("Mise à jour automatique", style = MaterialTheme.typography.titleMedium)
                     Text(
                         "Vérifie GitHub et installe la nouvelle version",
@@ -287,6 +289,7 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                Spacer(Modifier.width(12.dp))
                 Switch(
                     checked = settings.autoUpdate,
                     onCheckedChange = { vm.updateSettings(settings.copy(autoUpdate = it)) },
