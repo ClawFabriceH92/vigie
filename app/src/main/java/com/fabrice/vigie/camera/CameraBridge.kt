@@ -11,4 +11,9 @@ object CameraBridge {
     @Volatile var onJpegFrame: ((ByteArray) -> Unit)? = null
     @Volatile var onBurstPhoto: ((File) -> Unit)? = null
     @Volatile var burstCaptureRequested: (() -> Unit)? = null
+    // Vidéo (déclenchable à distance via le serveur)
+    @Volatile var videoStartRequested: (() -> Boolean)? = null
+    @Volatile var videoStopRequested: (() -> String?)? = null
+    @Volatile var videoListProvider: (() -> List<Pair<String, Long>>)? = null
+    @Volatile var videoFileProvider: ((String) -> File?)? = null
 }

@@ -24,6 +24,8 @@ class SettingsStore(context: Context) {
         val autoUpdate: Boolean = true,       // vérifier + installer les MAJ automatiquement
         val emailRecipient: String = "",      // destinataire pour l'envoi des photos par email
         val streamUser: String = "vigie",     // nom d'utilisateur pour l'accès distant
+        val jpegQuality: Int = 80,            // qualité du flux MJPEG (50..95)
+        val analysisHeight: Int = 480,        // hauteur d'analyse/flux (480 ou 720)
     )
 
     fun load(): Settings = Settings(
@@ -39,6 +41,8 @@ class SettingsStore(context: Context) {
         autoUpdate = prefs.getBoolean("auto_update", true),
         emailRecipient = prefs.getString("email_recipient", "") ?: "",
         streamUser = prefs.getString("stream_user", "vigie") ?: "vigie",
+        jpegQuality = prefs.getInt("jpeg_quality", 80),
+        analysisHeight = prefs.getInt("analysis_height", 480),
     )
 
     fun save(s: Settings) {
@@ -55,6 +59,8 @@ class SettingsStore(context: Context) {
             .putBoolean("auto_update", s.autoUpdate)
             .putString("email_recipient", s.emailRecipient)
             .putString("stream_user", s.streamUser)
+            .putInt("jpeg_quality", s.jpegQuality)
+            .putInt("analysis_height", s.analysisHeight)
             .apply()
     }
 }

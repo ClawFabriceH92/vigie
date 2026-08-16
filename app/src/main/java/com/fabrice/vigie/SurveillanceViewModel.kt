@@ -42,6 +42,7 @@ class SurveillanceViewModel(application: Application) : AndroidViewModel(applica
     val serviceRunning: StateFlow<Boolean> get() = VigieRuntime.serviceRunning
     val updateState: StateFlow<VigieRuntime.UpdateUiState> get() = VigieRuntime.updateState
     val intercomMuted: StateFlow<Boolean> get() = VigieRuntime.intercomMuted
+    val videoRecording: StateFlow<Boolean> get() = VigieRuntime.videoRecording
 
     // PIN
     fun isPinSet(): Boolean = VigieRuntime.isPinSet()
@@ -63,6 +64,11 @@ class SurveillanceViewModel(application: Application) : AndroidViewModel(applica
 
     // Intercom
     fun setIntercomMuted(muted: Boolean) = VigieRuntime.setIntercomMuted(muted)
+
+    // Vidéo
+    fun startVideoRecording(): Boolean = VigieRuntime.startVideoRecording()
+    fun stopVideoRecording(): String? = VigieRuntime.stopVideoRecording()
+    fun videoList(): List<Pair<String, Long>> = VigieRuntime.videoList()
 
     // Mode
     fun setManualMode(armed: Boolean) = VigieRuntime.setManualMode(armed)

@@ -45,6 +45,7 @@ import com.fabrice.vigie.data.SettingsStore
 import com.fabrice.vigie.security.PinHasher
 import com.fabrice.vigie.security.SecureGenerator
 import com.fabrice.vigie.ui.theme.AlertRed
+import com.fabrice.vigie.ui.theme.Amber
 import com.fabrice.vigie.ui.theme.DeepNight
 import com.fabrice.vigie.ui.theme.TrustGreen
 
@@ -102,6 +103,44 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
             Stepper("Photos par événement", settings.burstCount, "photo(s)", 1, 10, 1) { vm.updateSettings(settings.copy(burstCount = it)) }
             Stepper("Intervalle entre photos", (settings.burstIntervalMs / 100).toInt(), "× 100 ms", 3, 30, 1) { vm.updateSettings(settings.copy(burstIntervalMs = it * 100L)) }
             Stepper("Silence après un événement", settings.cooldownSec, "s", 10, 300, 10) { vm.updateSettings(settings.copy(cooldownSec = it)) }
+        }
+
+        SectionCard("Image") {
+            Text("Qualité du flux (MJPEG) : ${settings.jpegQuality}", style = MaterialTheme.typography.titleMedium)
+            Slider(
+                value = settings.jpegQuality.toFloat(),
+                onValueChange = { vm.updateSettings(settings.copy(jpegQuality = it.toInt())) },
+                valueRange = 50f..95f,
+                steps = 8,
+            )
+            Text(
+                "Plus haut = meilleure image mais flux plus lourd (80 par défaut)",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text("Résolution du flux : ${if (settings.analysisHeight >= 720) "HD (1280×720)" else "SD (640×480)"}", style = MaterialTheme.typography.titleMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { vm.updateSettings(settings.copy(analysisHeight = 480)) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (settings.analysisHeight < 720) Amber else MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+                ) { Text("SD 640×480", color = if (settings.analysisHeight < 720) DeepNight else MaterialTheme.colorScheme.onSurfaceVariant) }
+                Button(
+                    onClick = { vm.updateSettings(settings.copy(analysisHeight = 720)) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (settings.analysisHeight >= 720) Amber else MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+                ) { Text("HD 1280×720", color = if (settings.analysisHeight >= 720) DeepNight else MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+            Text(
+                "Appliqué au prochain démarrage du service (relance l'app).",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text("🎥 Enregistrement vidéo : HD (720p), déclenchable à distance via /video/start, /video/stop, /video/list sur le port 8080. Les fichiers MP4 sont téléchargeables depuis /video/list.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         SectionCard("Mode confiance (présence réseau)") {

@@ -71,6 +71,7 @@ object VigieRuntime {
     val eventsSizeMb = MutableStateFlow(0f)
     val serviceRunning = MutableStateFlow(false)
     val intercomMuted = MutableStateFlow(false)
+    val videoRecording = MutableStateFlow(false)
 
     // ---------- Interne ----------
 
@@ -361,6 +362,13 @@ object VigieRuntime {
         } catch (_: Exception) {
         }
     }
+
+    // ---------- Vidéo (déclenchable à distance) ----------
+
+    fun startVideoRecording(): Boolean = CameraBridge.videoStartRequested?.invoke() ?: false
+    fun stopVideoRecording(): String? = CameraBridge.videoStopRequested?.invoke()
+    fun videoList(): List<Pair<String, Long>> = CameraBridge.videoListProvider?.invoke() ?: emptyList()
+    fun videoFile(name: String): File? = CameraBridge.videoFileProvider?.invoke(name)
 
     // ---------- Mode / confiance ----------
 

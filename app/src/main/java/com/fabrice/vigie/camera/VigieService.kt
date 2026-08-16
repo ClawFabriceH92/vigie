@@ -62,6 +62,10 @@ class VigieService : LifecycleService() {
 
         engine = AnalysisEngine(this, this).also { it.start() }
         CameraBridge.burstCaptureRequested = { engine?.runBurst() }
+        CameraBridge.videoStartRequested = { engine?.startVideoRecording() ?: false }
+        CameraBridge.videoStopRequested = { engine?.stopVideoRecording() }
+        CameraBridge.videoListProvider = { engine?.videoList() ?: emptyList() }
+        CameraBridge.videoFileProvider = { name -> engine?.videoFile(name) }
         VigieRuntime.serviceRunning.value = true
         notifHandler.post(notifTicker)
     }
@@ -79,6 +83,10 @@ class VigieService : LifecycleService() {
     override fun onDestroy() {
         notifHandler.removeCallbacks(notifTicker)
         CameraBridge.burstCaptureRequested = null
+        CameraBridge.videoStartRequested = null
+        CameraBridge.videoStopRequested = null
+        CameraBridge.videoListProvider = null
+        CameraBridge.videoFileProvider = null
         engine?.stop()
         engine = null
         VigieRuntime.serviceRunning.value = false

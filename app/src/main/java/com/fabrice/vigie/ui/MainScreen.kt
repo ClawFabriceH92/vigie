@@ -142,6 +142,7 @@ private fun HomeOverlay(vm: SurveillanceViewModel) {
     val burstActive by vm.burstActive.collectAsStateWithLifecycle()
     val streamRunning by vm.streamRunning.collectAsStateWithLifecycle()
     val intercomMuted by vm.intercomMuted.collectAsStateWithLifecycle()
+    val videoRecording by vm.videoRecording.collectAsStateWithLifecycle()
 
     Box(Modifier.fillMaxSize()) {
         // Dégradé pour la lisibilité
@@ -208,6 +209,23 @@ private fun HomeOverlay(vm: SurveillanceViewModel) {
                 SurveillanceMode.DISARMED -> MainActionButton("Armer", TrustGreen) { vm.setManualMode(true) }
                 SurveillanceMode.ARMING -> MainActionButton("Désarmer", AlertRed) { vm.setManualMode(false) }
                 SurveillanceMode.STARTING -> {}
+            }
+            Spacer(Modifier.height(8.dp))
+            Surface(
+                color = if (videoRecording) AlertRed else Amber,
+                shape = RoundedCornerShape(14.dp),
+                onClick = {
+                    if (videoRecording) vm.stopVideoRecording()
+                    else vm.startVideoRecording()
+                },
+            ) {
+                Text(
+                    if (videoRecording) "⏹ Arrêter l'enregistrement vidéo" else "🎥 Démarrer l'enregistrement vidéo",
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (videoRecording) Color.White else DeepNight,
+                    fontWeight = FontWeight.Bold,
+                )
             }
             if (isManual) {
                 Spacer(Modifier.height(8.dp))

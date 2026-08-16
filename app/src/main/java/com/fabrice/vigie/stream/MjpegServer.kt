@@ -1,6 +1,7 @@
 package com.fabrice.vigie.stream
 
 import android.util.Base64
+import com.fabrice.vigie.camera.CameraBridge
 import fi.iki.elonen.NanoHTTPD
 import java.io.IOException
 import java.io.PipedInputStream
@@ -60,8 +61,73 @@ class MjpegServer(
             "/", "/index.html" -> pageResponse()
             "/stream" -> streamResponse()
             "/snapshot" -> snapshotResponse()
+            "/video/start" -> videoStartResponse()
+            "/video/stop" -> videoStopResponse()
+            "/video/list" -> videoListResponse()
+            "/video/download" -> videoDownloadResponse(session)
             else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "404")
         }
+    }
+
+    // ---------- Vidéo (contrôle à distance) ----------
+
+    private fun videoStartResponse(): Response {
+        val ok = CameraBridge.videoStartRequested?.invoke() ?: false
+        return newFixedLengthResponse(
+            if (ok) Response.Status.OK else Response.Status.CONFLICT,
+            "text/plain; charset=utf-8",
+            if (ok) "Enregistrement démarré" else "Déjà en cours ou indisponible",
+        )
+    }
+
+    private fun videoStopResponse(): Response {
+        val name = CameraBridge.videoStopRequested?.invoke()
+        return if (name != null) {
+            newFixedLengthResponse(Response.Status.OK, "text/plain; charset=utf-8", "Enregistrement arrêté : $name")
+        } else {
+            newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain; charset=utf-8", "Aucun enregistrement en cours")
+        }
+    }
+
+    private fun videoListResponse(): Response {
+        val videos = CameraBridge.videoListProvider?.invoke() ?: emptyList()
+        val html = buildString {
+            append("<html><head><meta charset='utf-8'><title>Vigie — vidéos</title>")
+            append("<style>body{background:#0A1F38;color:#FAF6EF;font-family:sans-serif;padding:16px}a{color:#E3B75C}li{margin:6px 0}</style></head><body>")
+            append("<h1>🎥 Vidéos enregistrées</h1>")
+            if (videos.isEmpty()) {
+                append("<p>Aucune vidéo pour l'instant.</p>")
+            } else {
+                append("<ul>")
+                for ((name, size) in videos) {
+                    val mb = "%.1f".format(size / 1_048_576.0)
+                    append("<li><a href=\"/video/download?name=${java.net.URLEncoder.encode(name, "UTF-8")}\">$name</a> — $mb Mo</li>")
+                }
+                append("</ul>")
+            }
+            append("<p><a href=\"/video/start\">▶ Démarrer un enregistrement</a> · <a href=\"/video/stop\">⏹ Arrêter</a> · <a href=\"/\">← Retour au flux</a></p>")
+            append("</body></html>")
+        }
+        val resp = newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", html)
+        resp.addHeader("Cache-Control", "no-cache")
+        return resp
+    }
+
+    private fun videoDownloadResponse(session: IHTTPSession): Response {
+        val name = session.parameters["name"]?.firstOrNull() ?: ""
+        val file = CameraBridge.videoFileProvider?.invoke(name)
+        if (file == null || !file.exists()) {
+            return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Fichier introuvable")
+        }
+        val resp = newFixedLengthResponse(
+            Response.Status.OK,
+            "video/mp4",
+            java.io.FileInputStream(file),
+            file.length(),
+        )
+        resp.addHeader("Content-Disposition", "attachment; filename=\"$name\"")
+        resp.addHeader("Cache-Control", "no-store")
+        return resp
     }
 
     private fun isAuthorized(session: IHTTPSession): Boolean {
