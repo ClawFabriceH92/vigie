@@ -1,5 +1,7 @@
 package com.fabrice.vigie.ui
 
+import android.content.Context
+import android.content.Intent
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -35,10 +37,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fabrice.vigie.SurveillanceViewModel
 import com.fabrice.vigie.data.EventStore
@@ -185,6 +189,7 @@ private fun EventDetailDialog(event: EventStore.Event, vm: SurveillanceViewModel
         SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.FRANCE).format(Date(event.timestamp))
     }
     var deleting by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     AlertDialog(
         onDismissRequest = onClose,
@@ -209,17 +214,54 @@ private fun EventDetailDialog(event: EventStore.Event, vm: SurveillanceViewModel
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                deleting = true
-                vm.deleteEvent(event.id)
-                deleting = false
-                onClose()
-            }) { Text("Supprimer", color = AlertRed) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (event.photos.isNotEmpty()) {
+                    TextButton(onClick = {
+                        shareEventPhotos(context, vm, event, date)
+                    }) { Text("📧 Envoyer par email") }
+                }
+                TextButton(onClick = {
+                    deleting = true
+                    vm.deleteEvent(event.id)
+                    deleting = false
+                    onClose()
+                }) { Text("Supprimer", color = AlertRed) }
+            }
         },
         dismissButton = {
             TextButton(onClick = onClose) { Text("Fermer") }
         },
     )
+}
+
+/**
+ * Ouvre le sélecteur de partage Android avec les photos de l'événement en
+ * pièces jointes → l'utilisateur choisit son app email installée (Gmail, etc.)
+ * et envoie depuis son compte. Prise en main classique Android.
+ */
+private fun shareEventPhotos(context: Context, vm: SurveillanceViewModel, event: EventStore.Event, date: String) {
+    try {
+        val uris = event.photos.mapNotNull { photo ->
+            val file = vm.photoFile(event.id, photo)
+            if (file.exists()) {
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            } else null
+        }
+        if (uris.isEmpty()) return
+        val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = "image/jpeg"
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+            putExtra(Intent.EXTRA_SUBJECT, "Vigie — événement ${event.mode} (${event.photos.size} photo(s))")
+            putExtra(Intent.EXTRA_TEXT, "Photos de l'événement Vigie du $date — envoyées depuis l'application.")
+            val recipient = vm.settings.value.emailRecipient.trim()
+            if (recipient.isNotEmpty()) {
+                putExtra(Intent.EXTRA_EMAIL, arrayOf(recipient))
+            }
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Envoyer les photos par…"))
+    } catch (_: Exception) {
+    }
 }
 
 @Composable

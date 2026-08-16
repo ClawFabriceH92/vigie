@@ -250,10 +250,20 @@ object VigieRuntime {
         updateLoopStarted = true
         val s = scope ?: return
         s.launch {
+            // Vérification immédiate au lancement
+            if (settings.value.autoUpdate) checkForUpdates()
             while (isActive) {
-                if (settings.value.autoUpdate) checkForUpdates()
-                // revérifie toutes les 6 h si l'app reste ouverte
-                delay(6 * 60 * 60 * 1000L)
+                val now = java.util.Calendar.getInstance()
+                val hour = now.get(java.util.Calendar.HOUR_OF_DAY)
+                val minute = now.get(java.util.Calendar.MINUTE)
+                if (settings.value.autoUpdate && hour == 14 && minute == 0) {
+                    checkForUpdates()
+                    // évite de re-déclencher plusieurs fois dans la même minute
+                    delay(61_000)
+                } else {
+                    // toutes les 30 s on surveille l'heure (léger) ; vérif réseau toutes les 6 h en secours
+                    delay(30_000)
+                }
             }
         }
     }

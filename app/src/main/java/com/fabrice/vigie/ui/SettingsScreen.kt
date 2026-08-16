@@ -169,6 +169,22 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
             }
         }
 
+        SectionCard("Envoi de photos par email") {
+            OutlinedTextField(
+                value = settings.emailRecipient,
+                onValueChange = { vm.updateSettings(settings.copy(emailRecipient = it)) },
+                label = { Text("Adresse du destinataire") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "Préremplie le destinataire quand tu envoies les photos d'un événement. Tu choisis ensuite ton app email (Gmail, etc.).",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         SectionCard("Mise à jour") {
             Row(
                 Modifier.fillMaxWidth(),

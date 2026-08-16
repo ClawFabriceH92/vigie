@@ -22,6 +22,7 @@ class SettingsStore(context: Context) {
         val trustDisarmDelaySec: Int = 120,   // délai sans confiance avant armement (s)
         val trustEnabled: Boolean = true,     // mode confiance actif
         val autoUpdate: Boolean = true,       // vérifier + installer les MAJ automatiquement
+        val emailRecipient: String = "",      // destinataire pour l'envoi des photos par email
     )
 
     fun load(): Settings = Settings(
@@ -35,6 +36,7 @@ class SettingsStore(context: Context) {
         trustDisarmDelaySec = prefs.getInt("trust_disarm_delay_sec", 120),
         trustEnabled = prefs.getBoolean("trust_enabled", true),
         autoUpdate = prefs.getBoolean("auto_update", true),
+        emailRecipient = prefs.getString("email_recipient", "") ?: "",
     )
 
     fun save(s: Settings) {
@@ -49,6 +51,7 @@ class SettingsStore(context: Context) {
             .putInt("trust_disarm_delay_sec", s.trustDisarmDelaySec)
             .putBoolean("trust_enabled", s.trustEnabled)
             .putBoolean("auto_update", s.autoUpdate)
+            .putString("email_recipient", s.emailRecipient)
             .apply()
     }
 }
