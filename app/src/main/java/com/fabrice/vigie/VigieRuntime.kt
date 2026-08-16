@@ -143,11 +143,15 @@ object VigieRuntime {
             streamRunning.value = false
         }
         // Intercom : démarre indépendamment ; cherche un port libre si le port
-        // prévu est déjà pris (ex: un autre service sur le réseau).
+        // prévu est déjà pris (ex: un autre service sur le réseau, ou un ancien
+        // serveur dont le port n'est pas encore libéré).
         intercomError.value = null
         var started = false
         var candidate = intercomPortCandidate
-        repeat(5) {
+        // 30 tentatives : couvre les ports pris en série et les restes TIME_WAIT
+        var attemptsLeft = 30
+        while (!started && attemptsLeft > 0) {
+            attemptsLeft--
             val ic = IntercomServer(appContext, { settings.value.streamPassword }, candidate)
             try {
                 ic.start()
@@ -155,15 +159,22 @@ object VigieRuntime {
                 intercomPort.value = candidate
                 intercomRunning.value = true
                 started = true
-                return@repeat
             } catch (e: Exception) {
-                intercomError.value = "Échec port $candidate : ${e.message}"
+                val msg = e.message ?: ""
+                intercomError.value = "Échec port $candidate : $msg"
+                // Si le port est occupé, on saute au suivant ; sinon on arrête vite
+                if (!msg.contains("EADDRINUSE") && !msg.contains("Address already in use")) {
+                    attemptsLeft = 2
+                }
                 candidate = if (candidate + 1 <= 65535) candidate + 1 else 1024
             }
         }
         if (!started) {
             intercom = null
             intercomRunning.value = false
+            if (intercomError.value == null) {
+                intercomError.value = "Aucun port libre trouvé (8081-8110 testés)"
+            }
         }
     }
 
@@ -277,9 +288,13 @@ object VigieRuntime {
         if (s.trustEnabled) nextScanAt = 0L
         recomputeMode()
         if (portChanged) {
-            // Redémarre les serveurs avec le nouveau port
-            stopServer()
-            startServer()
+            // Redémarre les serveurs avec le nouveau port — avec un petit délai
+            // pour laisser les anciens sockets se libérer (TIME_WAIT / EADDRINUSE)
+            scope?.launch {
+                stopServer()
+                delay(1_500)
+                startServer()
+            }
         }
     }
 
