@@ -116,9 +116,59 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(8.dp))
-            Stepper("Photos par événement", settings.burstCount, "photo(s)", 1, 10, 1) { vm.updateSettings(settings.copy(burstCount = it)) }
-            Stepper("Intervalle entre photos", (settings.burstIntervalMs / 100).toInt(), "× 100 ms", 3, 30, 1) { vm.updateSettings(settings.copy(burstIntervalMs = it * 100L)) }
             Stepper("Silence après un événement", settings.cooldownSec, "s", 10, 300, 10) { vm.updateSettings(settings.copy(cooldownSec = it)) }
+        }
+
+        SectionCard("Capture sur mouvement") {
+            Text("Mode de capture :", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { vm.updateSettings(settings.copy(motionCaptureMode = "photos")) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (settings.motionCaptureMode != "video") Amber else MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+                ) { Text("📷 Photos en rafale", color = if (settings.motionCaptureMode != "video") DeepNight else MaterialTheme.colorScheme.onSurfaceVariant) }
+                Button(
+                    onClick = { vm.updateSettings(settings.copy(motionCaptureMode = "video")) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (settings.motionCaptureMode == "video") Amber else MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+                ) { Text("🎥 Vidéo + son", color = if (settings.motionCaptureMode == "video") DeepNight else MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+            if (settings.motionCaptureMode == "video") {
+                Spacer(Modifier.height(8.dp))
+                Stepper("Durée d'enregistrement", settings.motionVideoDurationSec, "s", 5, 120, 5) { vm.updateSettings(settings.copy(motionVideoDurationSec = it)) }
+                Text(
+                    "À chaque détection : vidéo MP4 avec le son de la pièce, visible dans le journal et téléchargeable à distance.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Spacer(Modifier.height(8.dp))
+                Stepper("Photos par événement", settings.burstCount, "photo(s)", 1, 10, 1) { vm.updateSettings(settings.copy(burstCount = it)) }
+                Stepper("Intervalle entre photos", (settings.burstIntervalMs / 100).toInt(), "× 100 ms", 3, 30, 1) { vm.updateSettings(settings.copy(burstIntervalMs = it * 100L)) }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Horodatage sur les photos", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Date et heure en surimpression en bas de l'image",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(
+                    checked = settings.photoTimestamp,
+                    onCheckedChange = { vm.updateSettings(settings.copy(photoTimestamp = it)) },
+                )
+            }
         }
 
         SectionCard("Image") {
@@ -207,10 +257,16 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
             val streamClients by vm.streamClients.collectAsStateWithLifecycle()
             val context = LocalContext.current
             val streamRunningDiag by vm.streamRunning.collectAsStateWithLifecycle()
+            val intercomRunningDiag by vm.intercomRunning.collectAsStateWithLifecycle()
+            val intercomPortDiag by vm.intercomPort.collectAsStateWithLifecycle()
+            val intercomErrorDiag by vm.intercomError.collectAsStateWithLifecycle()
 
             Text("Serveur : ${if (streamRunningDiag) "✅ actif (port ${settings.streamPort})" else "❌ arrêté"}", style = MaterialTheme.typography.bodyLarge)
             Text("Clients stream : $streamClients", style = MaterialTheme.typography.bodyLarge)
-            Text("Intercom : port ${if (settings.streamPort + 1 <= 65535) settings.streamPort + 1 else settings.streamPort - 1}", style = MaterialTheme.typography.bodyLarge)
+            Text("Intercom : ${if (intercomRunningDiag) "✅ actif (port $intercomPortDiag)" else "❌ arrêté"}", style = MaterialTheme.typography.bodyLarge)
+            intercomErrorDiag?.let {
+                Text("Intercom erreur : $it", style = MaterialTheme.typography.bodySmall, color = AlertRed)
+            }
             Text("Caméra : $diagBinding", style = MaterialTheme.typography.bodyLarge)
             val secondsAgo = if (diagLastFrameAtMs > 0) (System.currentTimeMillis() - diagLastFrameAtMs) / 1000 else -1
             Text(

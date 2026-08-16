@@ -18,4 +18,14 @@ object CameraBridge {
     @Volatile var videoStopRequested: (() -> String?)? = null
     @Volatile var videoListProvider: (() -> List<Pair<String, Long>>)? = null
     @Volatile var videoFileProvider: ((String) -> File?)? = null
+    // Photos des événements (visualisation / suppression à distance)
+    @Volatile var photosListProvider: (() -> List<Triple<String, String, Long>>)? = null
+    @Volatile var photoFileProvider: ((String, String) -> File?)? = null
+    @Volatile var photoDeleteRequested: ((String, String) -> Boolean)? = null
+    // Contrôles caméra (zoom / flash à distance)
+    @Volatile var torchRequested: ((Boolean) -> Boolean)? = null
+    @Volatile var zoomRequested: ((Float) -> Boolean)? = null
+    @Volatile var zoomResetRequested: (() -> Boolean)? = null
+    // Statut pour la page web (batterie, résolution, état)
+    @Volatile var statusProvider: (() -> String)? = null
 }

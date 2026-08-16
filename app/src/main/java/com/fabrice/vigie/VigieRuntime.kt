@@ -77,6 +77,9 @@ object VigieRuntime {
     val diagLastFrameAtMs = MutableStateFlow(0L)
     val diagBinding = MutableStateFlow("pas démarré")
     val diagError = MutableStateFlow<String?>(null)
+    val intercomRunning = MutableStateFlow(false)
+    val intercomPort = MutableStateFlow(8081)
+    val intercomError = MutableStateFlow<String?>(null)
 
     // ---------- Interne ----------
 
@@ -121,14 +124,17 @@ object VigieRuntime {
 
     private fun startServer() {
         val port = settings.value.streamPort.coerceIn(1024, 65535)
-        val intercomPort = if (port + 1 <= 65535) port + 1 else port - 1
+        val intercomPortCandidate = if (port + 1 <= 65535) port + 1 else port - 1
         server = MjpegServer(
             port = port,
             userProvider = { settings.value.streamUser },
             passwordProvider = { settings.value.streamPassword },
-            intercomPortProvider = { if (settings.value.streamPort + 1 <= 65535) settings.value.streamPort + 1 else settings.value.streamPort - 1 },
+            intercomPortProvider = { intercomPort.value },
         )
-        server?.onClientsChanged = { count -> streamClients.value = count }
+        server?.onClientsChanged = { count ->
+            streamClients.value = count
+            notifyStreamClients(count)
+        }
         CameraBridge.isStreamActive = { server?.isStreaming() == true }
         try {
             server?.start(10_000, false)
@@ -136,12 +142,28 @@ object VigieRuntime {
         } catch (_: Exception) {
             streamRunning.value = false
         }
-        // Intercom : démarre indépendamment (ne bloque pas si le port est pris)
-        intercom = IntercomServer(appContext, { settings.value.streamPassword }, intercomPort)
-        try {
-            intercom?.start()
-        } catch (_: Exception) {
+        // Intercom : démarre indépendamment ; cherche un port libre si le port
+        // prévu est déjà pris (ex: un autre service sur le réseau).
+        intercomError.value = null
+        var started = false
+        var candidate = intercomPortCandidate
+        repeat(5) {
+            val ic = IntercomServer(appContext, { settings.value.streamPassword }, candidate)
+            try {
+                ic.start()
+                intercom = ic
+                intercomPort.value = candidate
+                intercomRunning.value = true
+                started = true
+                return@repeat
+            } catch (e: Exception) {
+                intercomError.value = "Échec port $candidate : ${e.message}"
+                candidate = if (candidate + 1 <= 65535) candidate + 1 else 1024
+            }
+        }
+        if (!started) {
             intercom = null
+            intercomRunning.value = false
         }
     }
 
@@ -159,6 +181,7 @@ object VigieRuntime {
         } catch (_: Exception) {
         }
         intercom = null
+        intercomRunning.value = false
     }
 
     private fun startScanLoop() {
@@ -389,6 +412,37 @@ object VigieRuntime {
     fun videoList(): List<Pair<String, Long>> = CameraBridge.videoListProvider?.invoke() ?: emptyList()
     fun videoFile(name: String): File? = CameraBridge.videoFileProvider?.invoke(name)
 
+    /** Notification Android : nombre de personnes connectées au flux. */
+    private fun notifyStreamClients(count: Int) {
+        try {
+            val nm = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val channel = NotificationChannel(
+                "vigie_stream",
+                "Stream",
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                description = "Personnes connectées au flux vidéo"
+            }
+            nm.createNotificationChannel(channel)
+            if (count <= 0) {
+                nm.cancel(2)
+                return
+            }
+            val notification = NotificationCompat.Builder(appContext, "vigie_stream")
+                .setSmallIcon(android.R.drawable.stat_sys_upload)
+                .setContentTitle("📡 Stream en cours")
+                .setContentText(
+                    if (count == 1) "1 personne connectée au flux"
+                    else "$count personnes connectées au flux"
+                )
+                .setOngoing(true)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .build()
+            nm.notify(2, notification)
+        } catch (_: Exception) {
+        }
+    }
+
     // ---------- Mode / confiance ----------
 
     fun setManualMode(armed: Boolean) {
@@ -442,12 +496,39 @@ object VigieRuntime {
 
     private fun onMotionScore(score: Float) {
         if (mode.value != SurveillanceMode.ARMED) return
-        if (burstActive.value) return
+        if (burstActive.value || videoRecording.value) return
         val now = System.currentTimeMillis()
         if (now - lastMotionMs < settings.value.cooldownSec * 1000L) return
         if (score <= settings.value.motionThreshold) return
         lastMotionMs = now
-        triggerBurst(score)
+        if (settings.value.motionCaptureMode == "video") {
+            triggerVideo(score)
+        } else {
+            triggerBurst(score)
+        }
+    }
+
+    /** Mode vidéo : enregistre MP4 + son pendant [motionVideoDurationSec]. */
+    private fun triggerVideo(score: Float) {
+        val (dir, event) = eventStore.createEvent(score, "mouvement")
+        burstTargetDir.value = dir
+        lastEvent.value = event
+        val ok = CameraBridge.videoStartRequested?.invoke() ?: false
+        if (!ok) {
+            // Repli photos si la vidéo est indisponible
+            triggerBurst(score)
+            return
+        }
+        val s = scope ?: return
+        s.launch {
+            delay(settings.value.motionVideoDurationSec * 1000L)
+            if (videoRecording.value) {
+                val name = CameraBridge.videoStopRequested?.invoke()
+                if (name != null) {
+                    eventStore.setEventVideo(event.id, name)
+                }
+            }
+        }
     }
 
     private fun triggerBurst(score: Float) {

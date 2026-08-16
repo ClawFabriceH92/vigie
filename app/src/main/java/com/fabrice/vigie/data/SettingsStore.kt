@@ -29,6 +29,9 @@ class SettingsStore(context: Context) {
         val streamPort: Int = 8080,           // port du serveur HTTP (flux + contrôle)
         val screenTimeoutMin: Int = 0,        // 0 = écran toujours allumé ; sinon extinction après X min
         val batteryAlertThreshold: Int = 20,  // % de batterie déclenchant l'alerte (0 = désactivé)
+        val motionCaptureMode: String = "photos", // "photos" (rafale) ou "video" (MP4 + son)
+        val motionVideoDurationSec: Int = 15, // durée d'enregistrement vidéo sur mouvement (s)
+        val photoTimestamp: Boolean = true,   // horodatage en surimpression sur les photos
     )
 
     fun load(): Settings = Settings(
@@ -49,6 +52,9 @@ class SettingsStore(context: Context) {
         streamPort = prefs.getInt("stream_port", 8080),
         screenTimeoutMin = prefs.getInt("screen_timeout_min", 0),
         batteryAlertThreshold = prefs.getInt("battery_alert_threshold", 20),
+        motionCaptureMode = prefs.getString("motion_capture_mode", "photos") ?: "photos",
+        motionVideoDurationSec = prefs.getInt("motion_video_duration_sec", 15),
+        photoTimestamp = prefs.getBoolean("photo_timestamp", true),
     )
 
     fun save(s: Settings) {
@@ -70,6 +76,9 @@ class SettingsStore(context: Context) {
             .putInt("stream_port", s.streamPort)
             .putInt("screen_timeout_min", s.screenTimeoutMin)
             .putInt("battery_alert_threshold", s.batteryAlertThreshold)
+            .putString("motion_capture_mode", s.motionCaptureMode)
+            .putInt("motion_video_duration_sec", s.motionVideoDurationSec)
+            .putBoolean("photo_timestamp", s.photoTimestamp)
             .apply()
     }
 }

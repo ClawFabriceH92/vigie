@@ -48,6 +48,9 @@ class SurveillanceViewModel(application: Application) : AndroidViewModel(applica
     val diagLastFrameAtMs: StateFlow<Long> get() = VigieRuntime.diagLastFrameAtMs
     val diagBinding: StateFlow<String> get() = VigieRuntime.diagBinding
     val diagError: StateFlow<String?> get() = VigieRuntime.diagError
+    val intercomRunning: StateFlow<Boolean> get() = VigieRuntime.intercomRunning
+    val intercomPort: StateFlow<Int> get() = VigieRuntime.intercomPort
+    val intercomError: StateFlow<String?> get() = VigieRuntime.intercomError
 
     // PIN
     fun isPinSet(): Boolean = VigieRuntime.isPinSet()

@@ -80,10 +80,116 @@ class MjpegServer(
             "/video/stop" -> videoStopResponse()
             "/video/list" -> videoListResponse()
             "/video/download" -> videoDownloadResponse(session)
+            "/photos" -> photosResponse()
+            "/photo" -> photoResponse(session)
+            "/photo/delete" -> photoDeleteResponse(session)
+            "/torch/on" -> torchResponse(true)
+            "/torch/off" -> torchResponse(false)
+            "/zoom/in" -> zoomResponse(1.4f)
+            "/zoom/out" -> zoomResponse(1f / 1.4f)
+            "/zoom/reset" -> zoomResponse(0f)
+            "/status" -> statusResponse()
             else -> {
                 android.util.Log.w("VigieHttp", "404 sur ${session.method}:${session.uri}")
                 newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "404 — page introuvable")
             }
+        }
+    }
+
+    // ---------- Flash / Zoom à distance ----------
+
+    private fun torchResponse(on: Boolean): Response {
+        val ok = CameraBridge.torchRequested?.invoke(on) ?: false
+        return newFixedLengthResponse(
+            if (ok) Response.Status.OK else Response.Status.SERVICE_UNAVAILABLE,
+            "text/plain; charset=utf-8",
+            if (ok) (if (on) "Flash allumé" else "Flash éteint") else "Flash indisponible",
+        )
+    }
+
+    private fun zoomResponse(factor: Float): Response {
+        val ok = if (factor == 0f) {
+            CameraBridge.zoomResetRequested?.invoke() ?: false
+        } else {
+            CameraBridge.zoomRequested?.invoke(factor) ?: false
+        }
+        return newFixedLengthResponse(
+            if (ok) Response.Status.OK else Response.Status.SERVICE_UNAVAILABLE,
+            "text/plain; charset=utf-8",
+            if (ok) "Zoom OK" else "Zoom indisponible",
+        )
+    }
+
+    // ---------- Statut (batterie / résolution) ----------
+
+    private fun statusResponse(): Response {
+        val json = CameraBridge.statusProvider?.invoke()
+            ?: "{\"battery\":-1,\"resolution\":\"?\",\"clients\":0,\"recording\":false}"
+        val resp = newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", json)
+        resp.addHeader("Cache-Control", "no-cache")
+        return resp
+    }
+
+    // ---------- Photos (visualisation / suppression à distance) ----------
+
+    private fun photosResponse(): Response {
+        val photos = CameraBridge.photosListProvider?.invoke() ?: emptyList()
+        val html = buildString {
+            append("<html><head><meta charset='utf-8'><title>Vigie — photos</title>")
+            append("<style>body{background:#0A1F38;color:#FAF6EF;font-family:sans-serif;padding:16px}a{color:#E3B75C}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}.card{background:#16294a;border-radius:10px;padding:8px;text-align:center}.card img{max-width:100%;border-radius:6px}.card .del{color:#E57373;font-size:13px}.menu{margin-bottom:12px}.menu a{background:#16294a;text-decoration:none;padding:8px 14px;border-radius:10px;font-weight:bold;margin-right:6px}</style></head><body>")
+            append("<div class='menu'><a href='/'>📺 Flux</a><a href='/video/list'>🎥 Vidéos</a><a href='/photos'>📷 Photos</a></div>")
+            append("<h1>📷 Photos des événements</h1>")
+            if (photos.isEmpty()) {
+                append("<p>Aucune photo enregistrée.</p>")
+            } else {
+                append("<div class='grid'>")
+                for ((eventId, name, ts) in photos) {
+                    val date = java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.FRANCE)
+                        .format(java.util.Date(ts))
+                    append("<div class='card'><img src='/photo?event=${java.net.URLEncoder.encode(eventId, "UTF-8")}&name=${java.net.URLEncoder.encode(name, "UTF-8")}'>")
+                    append("<p>$date</p>")
+                    append("<a class='del' href='/photo/delete?event=${java.net.URLEncoder.encode(eventId, "UTF-8")}&name=${java.net.URLEncoder.encode(name, "UTF-8")}'>🗑 Supprimer</a>")
+                    append("</div>")
+                }
+                append("</div>")
+            }
+            append("</body></html>")
+        }
+        val resp = newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", html)
+        resp.addHeader("Cache-Control", "no-cache")
+        return resp
+    }
+
+    private fun photoResponse(session: IHTTPSession): Response {
+        val eventId = session.parameters["event"]?.firstOrNull() ?: ""
+        val name = session.parameters["name"]?.firstOrNull() ?: ""
+        val file = CameraBridge.photoFileProvider?.invoke(eventId, name)
+        if (file == null || !file.exists()) {
+            return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Photo introuvable")
+        }
+        val resp = newFixedLengthResponse(
+            Response.Status.OK,
+            "image/jpeg",
+            java.io.FileInputStream(file),
+            file.length(),
+        )
+        resp.addHeader("Cache-Control", "no-store")
+        return resp
+    }
+
+    private fun photoDeleteResponse(session: IHTTPSession): Response {
+        val eventId = session.parameters["event"]?.firstOrNull() ?: ""
+        val name = session.parameters["name"]?.firstOrNull() ?: ""
+        val ok = CameraBridge.photoDeleteRequested?.invoke(eventId, name) ?: false
+        return if (ok) {
+            val redirect = newFixedLengthResponse(
+                Response.Status.OK,
+                "text/html; charset=utf-8",
+                "<html><head><meta http-equiv='refresh' content='0;url=/photos'></head><body>Supprimé — retour aux photos</body></html>",
+            )
+            redirect
+        } else {
+            newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Photo introuvable")
         }
     }
 
@@ -111,19 +217,18 @@ class MjpegServer(
         val videos = CameraBridge.videoListProvider?.invoke() ?: emptyList()
         val html = buildString {
             append("<html><head><meta charset='utf-8'><title>Vigie — vidéos</title>")
-            append("<style>body{background:#0A1F38;color:#FAF6EF;font-family:sans-serif;padding:16px}a{color:#E3B75C}li{margin:6px 0}</style></head><body>")
+            append("<style>body{background:linear-gradient(160deg,#0A1F38,#0D2B4E);color:#FAF6EF;font-family:'Segoe UI',sans-serif;padding:16px}a{color:#E3B75C}.menu{margin-bottom:12px}.menu a{background:rgba(255,255,255,.07);text-decoration:none;padding:8px 14px;border-radius:10px;font-weight:600;margin-right:6px}.menu a.active{background:#C9972B;color:#0A1F38}.card{background:#122a4d;border-radius:12px;padding:14px;margin:8px 0;display:flex;justify-content:space-between;align-items:center;border:1px solid rgba(255,255,255,.08)}.btn{background:#C9972B;color:#0A1F38;text-decoration:none;padding:8px 14px;border-radius:8px;font-weight:700}</style></head><body>")
+            append("<div class='menu'><a href='/'>📺 Flux</a><a href='/video/list' class='active'>🎥 Vidéos</a><a href='/photos'>📷 Photos</a></div>")
             append("<h1>🎥 Vidéos enregistrées</h1>")
             if (videos.isEmpty()) {
                 append("<p>Aucune vidéo pour l'instant.</p>")
             } else {
-                append("<ul>")
                 for ((name, size) in videos) {
                     val mb = "%.1f".format(size / 1_048_576.0)
-                    append("<li><a href=\"/video/download?name=${java.net.URLEncoder.encode(name, "UTF-8")}\">$name</a> — $mb Mo</li>")
+                    append("<div class='card'><span>$name — $mb Mo</span><a class='btn' href=\"/video/download?name=${java.net.URLEncoder.encode(name, "UTF-8")}\">⬇ Télécharger</a></div>")
                 }
-                append("</ul>")
             }
-            append("<p><a href=\"/video/start\">▶ Démarrer un enregistrement</a> · <a href=\"/video/stop\">⏹ Arrêter</a> · <a href=\"/\">← Retour au flux</a></p>")
+            append("<p style='margin-top:14px'><a class='btn' href='/video/start'>▶ Démarrer un enregistrement</a> &nbsp; <a class='btn' href='/video/stop'>⏹ Arrêter</a></p>")
             append("</body></html>")
         }
         val resp = newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", html)
@@ -163,21 +268,31 @@ class MjpegServer(
               <meta name="viewport" content="width=device-width, initial-scale=1">
               <title>Vigie — contrôle à distance</title>
               <style>
-                body { background:#0A1F38; color:#FAF6EF; font-family:sans-serif; margin:0; display:flex; flex-direction:column; align-items:center; padding:12px; }
-                h1 { color:#C9972B; margin:8px 0; font-size:22px; }
-                img { max-width:100%; height:auto; border-radius:10px; }
-                .menu { display:flex; gap:8px; margin:10px 0; flex-wrap:wrap; justify-content:center; }
-                .menu a { background:#16294a; color:#E3B75C; text-decoration:none; padding:8px 14px; border-radius:10px; font-size:14px; font-weight:bold; }
-                .menu a.active { background:#C9972B; color:#0A1F38; }
-                .info { color:#B8C7DA; font-size:14px; }
-                .controls { display:flex; gap:10px; margin:12px 0; align-items:center; flex-wrap:wrap; justify-content:center; }
-                button { background:#C9972B; color:#0A1F38; border:none; border-radius:12px; padding:14px 18px; font-size:16px; font-weight:bold; cursor:pointer; }
-                button:active { background:#E3B75C; }
-                button.off { background:#444; color:#aaa; }
-                button.listening { background:#2E7D32; color:#fff; }
-                button.rec { background:#C62828; color:#fff; }
-                .status { color:#81C784; font-size:13px; min-height:18px; }
+                :root { --bg:#0A1F38; --bg2:#0D2B4E; --card:#122a4d; --gold:#C9972B; --gold2:#E3B75C; --cream:#FAF6EF; --muted:#B8C7DA; --red:#C62828; --green:#2E7D32; }
+                * { box-sizing:border-box; }
+                body { background:linear-gradient(160deg, var(--bg) 0%, var(--bg2) 100%); color:var(--cream); font-family:'Segoe UI',system-ui,sans-serif; margin:0; display:flex; flex-direction:column; align-items:center; padding:16px; min-height:100vh; }
+                h1 { color:var(--gold); margin:10px 0 4px; font-size:24px; letter-spacing:.5px; text-shadow:0 2px 8px rgba(0,0,0,.4); }
+                .menu { display:flex; gap:8px; margin:14px 0; flex-wrap:wrap; justify-content:center; }
+                .menu a { background:rgba(255,255,255,.07); color:var(--gold2); text-decoration:none; padding:9px 16px; border-radius:12px; font-size:14px; font-weight:600; border:1px solid rgba(255,255,255,.08); transition:all .15s; backdrop-filter:blur(4px); }
+                .menu a:hover { background:rgba(255,255,255,.14); transform:translateY(-1px); }
+                .menu a.active { background:linear-gradient(135deg, var(--gold), var(--gold2)); color:var(--bg); border-color:transparent; box-shadow:0 4px 14px rgba(201,151,43,.35); }
+                .stream-wrap { background:#000; border-radius:16px; padding:6px; box-shadow:0 10px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.06); max-width:100%; }
+                img { max-width:100%; height:auto; border-radius:12px; display:block; }
+                .info { color:var(--muted); font-size:14px; margin:10px 0 4px; }
+                .controls { display:flex; gap:10px; margin:14px 0; align-items:center; flex-wrap:wrap; justify-content:center; }
+                button { background:linear-gradient(135deg, var(--gold), var(--gold2)); color:var(--bg); border:none; border-radius:12px; padding:13px 18px; font-size:15px; font-weight:700; cursor:pointer; transition:transform .12s, box-shadow .12s, background .2s; box-shadow:0 4px 12px rgba(0,0,0,.25); }
+                button:hover { transform:translateY(-1px); box-shadow:0 6px 18px rgba(0,0,0,.35); }
+                button:active { transform:translateY(1px); }
+                button:disabled { opacity:.5; cursor:default; transform:none; }
+                button.off { background:rgba(255,255,255,.10); color:var(--muted); }
+                button.listening { background:linear-gradient(135deg, #1B5E20, var(--green)); color:#fff; }
+                button.rec { background:linear-gradient(135deg, #B71C1C, var(--red)); color:#fff; }
+                .status { color:#81C784; font-size:13px; min-height:20px; text-align:center; max-width:90%; }
                 .status.err { color:#E57373; }
+                .infobar { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:7px 16px; color:var(--muted); font-size:13px; font-weight:600; margin:10px 0 0; letter-spacing:.3px; }
+                .infobar .b-low { color:#E57373; }
+                .flash-ind { display:inline-block; width:10px; height:10px; border-radius:50%; background:#555; margin-right:6px; vertical-align:middle; }
+                .flash-ind.on { background:#FFD54F; box-shadow:0 0 8px #FFD54F; }
               </style>
             </head>
             <body>
@@ -185,12 +300,19 @@ class MjpegServer(
               <div class="menu">
                 <a href="/" class="active">📺 Flux</a>
                 <a href="/video/list">🎥 Vidéos</a>
+                <a href="/photos">📷 Photos</a>
                 <a href="/snapshot" target="_blank">📸 Photo</a>
               </div>
-              <img src="/stream" alt="Flux Vigie">
+              <div class="stream-wrap">
+                <img src="/stream" alt="Flux Vigie" id="liveImg">
+              </div>
+              <div class="infobar" id="infobar">🔋 -- · 📺 -- · 👥 --</div>
               <p class="info">Flux temps réel — protégé par mot de passe</p>
               <div class="controls">
                 <button id="recBtn">🎥 Enregistrer</button>
+                <button id="flashBtn">⚡ Flash</button>
+                <button id="zoomInBtn">🔍 Zoom +</button>
+                <button id="zoomOutBtn">🔍 Zoom −</button>
                 <button id="talkBtn" class="off" disabled>🔇 Parler</button>
                 <button id="listenBtn" class="off" disabled>🔈 Écouter</button>
               </div>
@@ -206,17 +328,66 @@ class MjpegServer(
                 let talkNode = null;
                 let listenNode = null;
                 let recording = false;
+                let flashOn = false;
                 const queue = [];
 
                 const statusEl = document.getElementById("status");
                 const talkBtn = document.getElementById("talkBtn");
                 const listenBtn = document.getElementById("listenBtn");
                 const recBtn = document.getElementById("recBtn");
+                const flashBtn = document.getElementById("flashBtn");
+                const zoomInBtn = document.getElementById("zoomInBtn");
+                const zoomOutBtn = document.getElementById("zoomOutBtn");
 
                 function setStatus(text, err) {
                   statusEl.textContent = text;
                   statusEl.className = "status" + (err ? " err" : "");
                 }
+
+                // ---- Flash à distance ----
+                async function toggleFlash() {
+                  flashBtn.disabled = true;
+                  try {
+                    const r = await fetch(flashOn ? "/torch/off" : "/torch/on");
+                    flashOn = r.ok ? !flashOn : flashOn;
+                    if (flashOn) {
+                      flashBtn.innerHTML = '<span class="flash-ind on"></span>⚡ Flash ON';
+                      flashBtn.classList.add("rec");
+                      setStatus("⚡ Flash allumé");
+                    } else {
+                      flashBtn.innerHTML = '<span class="flash-ind"></span>⚡ Flash';
+                      flashBtn.classList.remove("rec");
+                      setStatus("Flash éteint");
+                    }
+                  } catch (e) {
+                    setStatus("⚠ Erreur flash", true);
+                  } finally {
+                    flashBtn.disabled = false;
+                  }
+                }
+                flashBtn.addEventListener("click", toggleFlash);
+
+                // ---- Statut périodique (batterie / résolution / clients) ----
+                async function refreshStatus() {
+                  try {
+                    const r = await fetch("/status");
+                    const s = await r.json();
+                    const infobar = document.getElementById("infobar");
+                    const batt = s.battery >= 0 ? s.battery + "%" : "--";
+                    const battClass = s.battery >= 0 && s.battery <= 20 ? ' class="b-low"' : "";
+                    infobar.innerHTML = '🔋 <span' + battClass + '>' + batt + '</span> · 📺 ' + s.resolution + ' · 👥 ' + s.clients + (s.recording ? ' · 🔴 ENREGISTREMENT' : '');
+                  } catch (e) {}
+                }
+                refreshStatus();
+                setInterval(refreshStatus, 5000);
+
+                // ---- Zoom à distance ----
+                zoomInBtn.addEventListener("click", async () => {
+                  try { await fetch("/zoom/in"); } catch (e) {}
+                });
+                zoomOutBtn.addEventListener("click", async () => {
+                  try { await fetch("/zoom/out"); } catch (e) {}
+                });
 
                 // ---- Enregistrement vidéo à distance ----
                 async function toggleRecording() {

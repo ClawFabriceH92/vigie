@@ -75,6 +75,28 @@ class VigieService : LifecycleService() {
         CameraBridge.videoStopRequested = { engine?.stopVideoRecording() }
         CameraBridge.videoListProvider = { engine?.videoList() ?: emptyList() }
         CameraBridge.videoFileProvider = { name -> engine?.videoFile(name) }
+        CameraBridge.photosListProvider = {
+            VigieRuntime.listEvents().flatMap { ev ->
+                ev.photos.map { Triple(ev.id, it, ev.timestamp) }
+            }
+        }
+        CameraBridge.photoFileProvider = { eventId, name ->
+            val f = VigieRuntime.photoFile(eventId, name)
+            if (f.exists()) f else null
+        }
+        CameraBridge.photoDeleteRequested = { eventId, name ->
+            val f = VigieRuntime.photoFile(eventId, name)
+            if (f.exists()) f.delete() else false
+        }
+        CameraBridge.torchRequested = { on -> engine?.setTorch(on) ?: false }
+        CameraBridge.zoomRequested = { factor -> engine?.zoomBy(factor) ?: false }
+        CameraBridge.zoomResetRequested = { engine?.resetZoom() ?: false }
+        CameraBridge.statusProvider = {
+            val battery = com.fabrice.vigie.power.PowerMonitorReceiver.batteryLevel(this)
+            val res = if (VigieRuntime.settings.value.analysisHeight >= 720) "1280×720" else "640×480"
+            val clients = VigieRuntime.streamClients.value
+            "{\"battery\":$battery,\"resolution\":\"$res\",\"clients\":$clients,\"recording\":${VigieRuntime.videoRecording.value}}"
+        }
         com.fabrice.vigie.power.PowerMonitorReceiver.register(this)
         VigieRuntime.serviceRunning.value = true
         notifHandler.post(notifTicker)
@@ -97,6 +119,13 @@ class VigieService : LifecycleService() {
         CameraBridge.videoStopRequested = null
         CameraBridge.videoListProvider = null
         CameraBridge.videoFileProvider = null
+        CameraBridge.photosListProvider = null
+        CameraBridge.photoFileProvider = null
+        CameraBridge.photoDeleteRequested = null
+        CameraBridge.torchRequested = null
+        CameraBridge.zoomRequested = null
+        CameraBridge.zoomResetRequested = null
+        CameraBridge.statusProvider = null
         engine?.stop()
         engine = null
         VigieRuntime.serviceRunning.value = false

@@ -20,6 +20,7 @@ class EventStore(private val context: Context) {
         val score: Float,
         val photos: List<String>, // noms de fichiers
         val mode: String,         // "armé" / "manuel"
+        val video: String? = null, // nom du MP4 si capture vidéo
     )
 
     private val root: File get() = File(context.filesDir, "events")
@@ -66,11 +67,25 @@ class EventStore(private val context: Context) {
                 score = json?.optDouble("score", 0.0)?.toFloat() ?: 0f,
                 photos = photos,
                 mode = json?.optString("mode", "") ?: "",
+                video = json?.optString("video", "")?.takeIf { it.isNotEmpty() },
             )
         }?.sortedByDescending { it.timestamp } ?: emptyList()
     }
 
     fun photoFile(eventId: String, photoName: String): File = File(File(root, eventId), photoName)
+
+    /** Associe une vidéo à un événement existant (après fin d'enregistrement). */
+    fun setEventVideo(eventId: String, videoName: String) {
+        val dir = File(root, eventId)
+        val meta = File(dir, "event.json")
+        if (!meta.exists()) return
+        try {
+            val json = JSONObject(meta.readText())
+            json.put("video", videoName)
+            meta.writeText(json.toString())
+        } catch (_: Exception) {
+        }
+    }
 
     fun deleteEvent(eventId: String) {
         File(root, eventId).deleteRecursively()

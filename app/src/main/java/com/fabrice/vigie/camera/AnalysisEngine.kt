@@ -42,6 +42,8 @@ class AnalysisEngine(
     private val lifecycleOwner: LifecycleOwner,
 ) {
     private var cameraProvider: ProcessCameraProvider? = null
+    private var cameraControl: androidx.camera.core.CameraControl? = null
+    private var cameraInfo: androidx.camera.core.CameraInfo? = null
     private var imageCapture: ImageCapture? = null
     private var analysis: ImageAnalysis? = null
     private var videoCapture: VideoCapture<Recorder>? = null
@@ -119,7 +121,9 @@ class AnalysisEngine(
         )
         for (attempt in attempts) {
             try {
-                provider.bindToLifecycle(lifecycleOwner, selector, *attempt.toTypedArray())
+                val camera = provider.bindToLifecycle(lifecycleOwner, selector, *attempt.toTypedArray())
+                cameraControl = camera.cameraControl
+                cameraInfo = camera.cameraInfo
                 diagBinding = if (attempt.size == 2) "analyse + photo" else "analyse seule"
                 android.util.Log.i("VigieCam", "Binding : $diagBinding")
                 return
@@ -136,17 +140,55 @@ class AnalysisEngine(
         val a = analysis ?: return false
         val v = videoCapture ?: return false
         return try {
-            provider.bindToLifecycle(
+            val camera = provider.bindToLifecycle(
                 lifecycleOwner,
                 CameraSelector.DEFAULT_BACK_CAMERA,
                 a,
                 v,
             )
+            cameraControl = camera.cameraControl
+            cameraInfo = camera.cameraInfo
             diagBinding = "analyse + vidéo"
             true
         } catch (e: Exception) {
             diagError = "Binding vidéo : ${e.message}"
             android.util.Log.e("VigieCam", diagError!!)
+            false
+        }
+    }
+
+    // ---------- Contrôles caméra (zoom / flash) ----------
+
+    fun setTorch(on: Boolean): Boolean {
+        val cc = cameraControl ?: return false
+        return try {
+            cc.enableTorch(on).get()
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun zoomBy(factor: Float): Boolean {
+        val cc = cameraControl ?: return false
+        val info = cameraInfo ?: return false
+        return try {
+            val state = info.zoomState.value ?: return false
+            val current = state.zoomRatio
+            val next = (current * factor).coerceIn(1f, state.maxZoomRatio)
+            cc.setZoomRatio(next).get()
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun resetZoom(): Boolean {
+        val cc = cameraControl ?: return false
+        return try {
+            cc.setZoomRatio(1f).get()
+            true
+        } catch (_: Exception) {
             false
         }
     }
@@ -173,6 +215,9 @@ class AnalysisEngine(
         val opts = ImageCapture.OutputFileOptions.Builder(target).build()
         ic.takePicture(opts, ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                if (VigieRuntime.settings.value.photoTimestamp) {
+                    stampTimestamp(target)
+                }
                 onResult(true)
             }
 
@@ -182,9 +227,39 @@ class AnalysisEngine(
         })
     }
 
+    /** Dessine le jour + heure en surimpression (bas de l'image). */
+    private fun stampTimestamp(file: File) {
+        try {
+            val src = android.graphics.BitmapFactory.decodeFile(file.absolutePath) ?: return
+            val bmp = src.copy(android.graphics.Bitmap.Config.ARGB_8888, true)
+            src.recycle()
+            val canvas = android.graphics.Canvas(bmp)
+            val text = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.FRANCE)
+                .format(java.util.Date())
+            val size = bmp.width / 28f
+            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                textSize = size
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                setShadowLayer(8f, 0f, 0f, android.graphics.Color.BLACK)
+            }
+            val y = bmp.height - bmp.height / 40f
+            val x = bmp.width / 60f
+            canvas.drawText(text, x, y, paint)
+            val out = java.io.FileOutputStream(file)
+            try {
+                bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, out)
+            } finally {
+                out.close()
+                bmp.recycle()
+            }
+        } catch (_: Exception) {
+        }
+    }
+
     // ---------- Vidéo ----------
 
-    /** Démarre un enregistrement MP4 (sans audio). Retourne false si déjà en cours ou indisponible. */
+    /** Démarre un enregistrement MP4 avec son. Retourne false si déjà en cours ou indisponible. */
     fun startVideoRecording(): Boolean {
         val vc = videoCapture
         val provider = cameraProvider
@@ -195,7 +270,14 @@ class AnalysisEngine(
         val file = File(dir, "vigie_${System.currentTimeMillis()}.mp4")
         val options = FileOutputOptions.Builder(file).build()
         return try {
-            recording = vc.output.prepareRecording(context, options)
+            val prepared = vc.output.prepareRecording(context, options)
+            // Active le son (micro) — la permission RECORD_AUDIO est déjà demandée au lancement
+            val withAudio = try {
+                prepared.withAudioEnabled()
+            } catch (_: Exception) {
+                prepared
+            }
+            recording = withAudio
                 .start(ContextCompat.getMainExecutor(context)) { event ->
                     when (event) {
                         is VideoRecordEvent.Start -> {
