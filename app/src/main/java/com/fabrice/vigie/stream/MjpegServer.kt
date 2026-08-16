@@ -36,11 +36,23 @@ class MjpegServer(
 
     private val listeners = CopyOnWriteArrayList<MjpegWriter>()
 
+    /** Appelé quand le nombre de clients du flux change (pour l'indicateur UI). */
+    @Volatile var onClientsChanged: ((Int) -> Unit)? = null
+
+    fun clientCount(): Int = listeners.size
+
+    fun isStreaming(): Boolean = listeners.isNotEmpty()
+
+    fun lastFrameAtMs(): Long = lastFrameTimestamp
+
+    @Volatile private var lastFrameTimestamp = 0L
+
     // ---------- Alimentation ----------
 
     fun publish(jpeg: ByteArray) {
         latestJpeg = jpeg
         frameSeq++
+        lastFrameTimestamp = System.currentTimeMillis()
         for (w in listeners) w.onFrame()
     }
 
@@ -344,6 +356,7 @@ class MjpegServer(
     private fun streamResponse(): Response {
         val writer = MjpegWriter()
         listeners.add(writer)
+        onClientsChanged?.invoke(listeners.size)
         val resp = newChunkedResponse(
             Response.Status.OK,
             "multipart/x-mixed-replace; boundary=$BOUNDARY",
@@ -395,6 +408,7 @@ class MjpegServer(
             } finally {
                 running = false
                 listeners.remove(this)
+                onClientsChanged?.invoke(listeners.size)
                 try { output.close() } catch (_: Exception) {}
             }
         }

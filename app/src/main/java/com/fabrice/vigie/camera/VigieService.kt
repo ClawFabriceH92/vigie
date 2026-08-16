@@ -50,8 +50,17 @@ class VigieService : LifecycleService() {
     private val notifTicker = object : Runnable {
         override fun run() {
             updateNotification()
+            refreshDiagnostics()
             notifHandler.postDelayed(this, 5_000)
         }
+    }
+
+    private fun refreshDiagnostics() {
+        val e = engine ?: return
+        VigieRuntime.diagFrameCount.value = e.diagFrameCount
+        VigieRuntime.diagLastFrameAtMs.value = e.diagLastFrameAtMs
+        VigieRuntime.diagBinding.value = e.diagBinding
+        VigieRuntime.diagError.value = e.diagError
     }
 
     override fun onCreate() {

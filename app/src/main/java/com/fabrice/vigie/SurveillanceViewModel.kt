@@ -43,6 +43,11 @@ class SurveillanceViewModel(application: Application) : AndroidViewModel(applica
     val updateState: StateFlow<VigieRuntime.UpdateUiState> get() = VigieRuntime.updateState
     val intercomMuted: StateFlow<Boolean> get() = VigieRuntime.intercomMuted
     val videoRecording: StateFlow<Boolean> get() = VigieRuntime.videoRecording
+    val streamClients: StateFlow<Int> get() = VigieRuntime.streamClients
+    val diagFrameCount: StateFlow<Long> get() = VigieRuntime.diagFrameCount
+    val diagLastFrameAtMs: StateFlow<Long> get() = VigieRuntime.diagLastFrameAtMs
+    val diagBinding: StateFlow<String> get() = VigieRuntime.diagBinding
+    val diagError: StateFlow<String?> get() = VigieRuntime.diagError
 
     // PIN
     fun isPinSet(): Boolean = VigieRuntime.isPinSet()

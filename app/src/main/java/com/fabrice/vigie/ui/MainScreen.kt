@@ -143,6 +143,7 @@ private fun HomeOverlay(vm: SurveillanceViewModel) {
     val streamRunning by vm.streamRunning.collectAsStateWithLifecycle()
     val intercomMuted by vm.intercomMuted.collectAsStateWithLifecycle()
     val videoRecording by vm.videoRecording.collectAsStateWithLifecycle()
+    val streamClients by vm.streamClients.collectAsStateWithLifecycle()
 
     Box(Modifier.fillMaxSize()) {
         // Dégradé pour la lisibilité
@@ -161,6 +162,28 @@ private fun HomeOverlay(vm: SurveillanceViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             StatusBadge(mode, armingRemaining)
+            if (streamClients > 0) {
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    color = Color(0xFF1B5E20),
+                    shape = RoundedCornerShape(12.dp),
+                    shadowElevation = 4.dp,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Box(Modifier.size(8.dp).background(Color(0xFF81C784), RoundedCornerShape(4.dp)))
+                        Text(
+                            "Stream — ${if (streamClients == 1) "1 personne connectée" else "$streamClients personnes connectées"}",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            }
             if (isManual) {
                 Spacer(Modifier.height(8.dp))
                 Surface(
@@ -249,6 +272,14 @@ private fun HomeOverlay(vm: SurveillanceViewModel) {
                 style = MaterialTheme.typography.labelMedium,
                 color = Color(0xFFB8C7DA),
             )
+            if (streamRunning && streamClients == 0) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "📡 Le stream s'active quand un client se connecte (ouvre l'URL ci-dessus dans un navigateur)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFFB8C7DA),
+                )
+            }
             if (streamRunning) {
                 Spacer(Modifier.height(6.dp))
                 Surface(

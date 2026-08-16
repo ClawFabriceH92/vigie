@@ -72,6 +72,11 @@ object VigieRuntime {
     val serviceRunning = MutableStateFlow(false)
     val intercomMuted = MutableStateFlow(false)
     val videoRecording = MutableStateFlow(false)
+    val streamClients = MutableStateFlow(0)
+    val diagFrameCount = MutableStateFlow(0L)
+    val diagLastFrameAtMs = MutableStateFlow(0L)
+    val diagBinding = MutableStateFlow("pas démarré")
+    val diagError = MutableStateFlow<String?>(null)
 
     // ---------- Interne ----------
 
@@ -123,6 +128,8 @@ object VigieRuntime {
             passwordProvider = { settings.value.streamPassword },
             intercomPortProvider = { if (settings.value.streamPort + 1 <= 65535) settings.value.streamPort + 1 else settings.value.streamPort - 1 },
         )
+        server?.onClientsChanged = { count -> streamClients.value = count }
+        CameraBridge.isStreamActive = { server?.isStreaming() == true }
         try {
             server?.start(10_000, false)
             streamRunning.value = true
@@ -145,6 +152,8 @@ object VigieRuntime {
         }
         server = null
         streamRunning.value = false
+        streamClients.value = 0
+        CameraBridge.isStreamActive = null
         try {
             intercom?.shutdown()
         } catch (_: Exception) {

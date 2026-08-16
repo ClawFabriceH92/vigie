@@ -52,6 +52,12 @@ class AnalysisEngine(
 
     private val analyzer = MotionAnalyzer()
 
+    // ---------- Diagnostics ----------
+    @Volatile var diagFrameCount: Long = 0
+    @Volatile var diagLastFrameAtMs: Long = 0
+    @Volatile var diagBinding: String = "pas démarré"
+    @Volatile var diagError: String? = null
+
     fun start() {
         val future = ProcessCameraProvider.getInstance(context)
         future.addListener({
@@ -74,6 +80,20 @@ class AnalysisEngine(
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                 .build()
 
+            // La vidéo n'est PAS liée au démarrage : sur les vieux téléphones,
+            // cumuler 3 use cases (analyse + photo + vidéo) faisait échouer tout
+            // le binding → flux vide. Elle est liée dynamiquement pendant
+            // l'enregistrement uniquement (voir startVideoRecording).
+            buildVideoCapture()
+
+            // NE PAS unbindAll() : le Preview de l'activité est lié séparément.
+            // Liens analysis + photo : la combinaison qui fonctionnait avant la vidéo.
+            bindAnalysisAndPhoto(provider)
+        }, ContextCompat.getMainExecutor(context))
+    }
+
+    private fun buildVideoCapture() {
+        try {
             val recorder = Recorder.Builder()
                 .setQualitySelector(
                     QualitySelector.fromOrderedList(
@@ -83,43 +103,52 @@ class AnalysisEngine(
                 )
                 .build()
             videoCapture = VideoCapture.withOutput(recorder)
-
-            // NE PAS unbindAll() : le Preview de l'activité est lié séparément.
-            // Dégradation progressive : sur les vieux téléphones, 3 use cases en
-            // parallèle (analyse + photo + vidéo) peuvent dépasser les capacités
-            // → on retire la vidéo puis la photo, jamais l'analyse (flux vital).
-            bindWithFallback(provider, analysis, imageCapture, videoCapture)
-        }, ContextCompat.getMainExecutor(context))
+        } catch (e: Exception) {
+            diagError = "Échec création VideoCapture : ${e.message}"
+            android.util.Log.e("VigieCam", diagError!!)
+            videoCapture = null
+        }
     }
 
-    private fun bindWithFallback(
-        provider: ProcessCameraProvider,
-        analysis: ImageAnalysis,
-        imageCapture: ImageCapture?,
-        videoCapture: VideoCapture<Recorder>?,
-    ) {
+    /** Lie analyse + photo ; en cas d'échec, analyse seule. */
+    private fun bindAnalysisAndPhoto(provider: ProcessCameraProvider) {
         val selector = CameraSelector.DEFAULT_BACK_CAMERA
         val attempts = listOf(
-            listOfNotNull(analysis, imageCapture, videoCapture),
             listOfNotNull(analysis, imageCapture),
             listOfNotNull(analysis),
         )
         for (attempt in attempts) {
             try {
                 provider.bindToLifecycle(lifecycleOwner, selector, *attempt.toTypedArray())
-                if (videoCapture != null && attempt.contains(videoCapture)) {
-                    android.util.Log.i("VigieCam", "Binding complet (analyse + photo + vidéo)")
-                } else if (attempt.size < 3) {
-                    android.util.Log.w("VigieCam", "Binding réduit à ${attempt.size} use case(s) — vidéo indisponible")
-                    // La vidéo n'a pas pu être liée : on la désactive proprement
-                    this.videoCapture = null
-                }
+                diagBinding = if (attempt.size == 2) "analyse + photo" else "analyse seule"
+                android.util.Log.i("VigieCam", "Binding : $diagBinding")
                 return
-            } catch (_: Exception) {
-                android.util.Log.w("VigieCam", "Binding ${attempt.size} use case(s) échoué, tentative réduite")
+            } catch (e: Exception) {
+                diagError = "Binding ${attempt.size} use case(s) : ${e.message}"
+                android.util.Log.w("VigieCam", diagError!!)
             }
         }
-        android.util.Log.e("VigieCam", "Aucun binding caméra possible")
+        diagBinding = "échec total"
+    }
+
+    /** Lie analyse + vidéo (remplace photo pendant l'enregistrement). */
+    private fun bindAnalysisAndVideo(provider: ProcessCameraProvider): Boolean {
+        val a = analysis ?: return false
+        val v = videoCapture ?: return false
+        return try {
+            provider.bindToLifecycle(
+                lifecycleOwner,
+                CameraSelector.DEFAULT_BACK_CAMERA,
+                a,
+                v,
+            )
+            diagBinding = "analyse + vidéo"
+            true
+        } catch (e: Exception) {
+            diagError = "Binding vidéo : ${e.message}"
+            android.util.Log.e("VigieCam", diagError!!)
+            false
+        }
     }
 
     fun stop() {
@@ -158,7 +187,10 @@ class AnalysisEngine(
     /** Démarre un enregistrement MP4 (sans audio). Retourne false si déjà en cours ou indisponible. */
     fun startVideoRecording(): Boolean {
         val vc = videoCapture
-        if (vc == null || recording != null) return false
+        val provider = cameraProvider
+        if (vc == null || recording != null || provider == null) return false
+        // Lie analyse + vidéo (remplace photo temporairement)
+        if (!bindAnalysisAndVideo(provider)) return false
         val dir = File(context.filesDir, "videos").apply { mkdirs() }
         val file = File(dir, "vigie_${System.currentTimeMillis()}.mp4")
         val options = FileOutputOptions.Builder(file).build()
@@ -174,6 +206,8 @@ class AnalysisEngine(
                             recordingName = null
                             VigieRuntime.videoRecording.value = false
                             recording = null
+                            // Retour au binding analyse + photo
+                            bindAnalysisAndPhoto(provider)
                         }
                         else -> {}
                     }
@@ -242,6 +276,8 @@ class AnalysisEngine(
         override fun analyze(image: ImageProxy) {
             try {
                 frameCount++
+                diagFrameCount++
+                diagLastFrameAtMs = System.currentTimeMillis()
                 val yPlane = image.planes[0]
                 val y = FrameExtractor.extractY(yPlane.buffer, yPlane.rowStride, image.height)
                 val frame = MotionDetector.downsample(y, image.width, image.height, yPlane.rowStride)
@@ -255,7 +291,8 @@ class AnalysisEngine(
                 previous = frame
 
                 val now = SystemClock.elapsedRealtime()
-                if (now - lastJpegMs >= 200) {
+                val streamOn = CameraBridge.isStreamActive?.invoke() == true
+                if (streamOn && now - lastJpegMs >= 200) {
                     val uPlane = image.planes[1]
                     val vPlane = image.planes[2]
                     val nv21 = FrameExtractor.yuv420ToNv21(

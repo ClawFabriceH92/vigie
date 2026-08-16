@@ -11,6 +11,8 @@ object CameraBridge {
     @Volatile var onJpegFrame: ((ByteArray) -> Unit)? = null
     @Volatile var onBurstPhoto: ((File) -> Unit)? = null
     @Volatile var burstCaptureRequested: (() -> Unit)? = null
+    /** Vrai si au moins un client est connecté au flux → on peut encoder les frames. */
+    @Volatile var isStreamActive: (() -> Boolean)? = null
     // Vidéo (déclenchable à distance via le serveur)
     @Volatile var videoStartRequested: (() -> Boolean)? = null
     @Volatile var videoStopRequested: (() -> String?)? = null

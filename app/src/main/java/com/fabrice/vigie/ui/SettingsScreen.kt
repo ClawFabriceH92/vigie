@@ -1,5 +1,6 @@
 package com.fabrice.vigie.ui
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,12 +36,13 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fabrice.vigie.BuildConfig
 import com.fabrice.vigie.SurveillanceViewModel
@@ -154,7 +156,13 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(8.dp))
-            Text("🎥 Enregistrement vidéo : HD (720p), déclenchable à distance via /video/start, /video/stop, /video/list sur le port 8080. Les fichiers MP4 sont téléchargeables depuis /video/list.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("🎥 Enregistrement vidéo : HD (720p), déclenchable à distance via /video/start, /video/stop, /video/list sur le port ${settings.streamPort}. Les fichiers MP4 sont téléchargeables depuis /video/list.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "📡 Le flux vidéo ne s'active que lorsqu'un client se connecte (http://IP:${settings.streamPort}/stream). Il est indépendant du mode rafale (photos sur détection de mouvement). Reviens sur l'écran d'accueil pour voir l'URL et lancer le stream.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         SectionCard("Écran & batterie") {
@@ -186,6 +194,58 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
             Spacer(Modifier.height(8.dp))
             Text(
                 "🔌 Notification automatique en cas de coupure de courant (Vigie sur batterie) et de reprise de courant.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        SectionCard("Diagnostic") {
+            val diagFrameCount by vm.diagFrameCount.collectAsStateWithLifecycle()
+            val diagLastFrameAtMs by vm.diagLastFrameAtMs.collectAsStateWithLifecycle()
+            val diagBinding by vm.diagBinding.collectAsStateWithLifecycle()
+            val diagError by vm.diagError.collectAsStateWithLifecycle()
+            val streamClients by vm.streamClients.collectAsStateWithLifecycle()
+            val context = LocalContext.current
+            val streamRunningDiag by vm.streamRunning.collectAsStateWithLifecycle()
+
+            Text("Serveur : ${if (streamRunningDiag) "✅ actif (port ${settings.streamPort})" else "❌ arrêté"}", style = MaterialTheme.typography.bodyLarge)
+            Text("Clients stream : $streamClients", style = MaterialTheme.typography.bodyLarge)
+            Text("Intercom : port ${if (settings.streamPort + 1 <= 65535) settings.streamPort + 1 else settings.streamPort - 1}", style = MaterialTheme.typography.bodyLarge)
+            Text("Caméra : $diagBinding", style = MaterialTheme.typography.bodyLarge)
+            val secondsAgo = if (diagLastFrameAtMs > 0) (System.currentTimeMillis() - diagLastFrameAtMs) / 1000 else -1
+            Text(
+                if (secondsAgo >= 0) "Frames analysées : $diagFrameCount — dernière il y a ${secondsAgo}s"
+                else "Frames analysées : $diagFrameCount — aucune reçue",
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (secondsAgo >= 0 && secondsAgo < 5) TrustGreen else AlertRed,
+            )
+            diagError?.let {
+                Spacer(Modifier.height(4.dp))
+                Text("Erreur : $it", style = MaterialTheme.typography.bodySmall, color = AlertRed)
+            }
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_SUBJECT, "Test Vigie — ${BuildConfig.VERSION_NAME}")
+                        putExtra(
+                            Intent.EXTRA_TEXT,
+                            "Ceci est un email de test envoyé depuis Vigie v${BuildConfig.VERSION_NAME}.\n" +
+                                "Port serveur : ${settings.streamPort} · Clients : $streamClients · Caméra : $diagBinding" +
+                                (diagError?.let { "\nErreur : $it" } ?: ""),
+                        )
+                        val recipient = settings.emailRecipient.trim()
+                        if (recipient.isNotEmpty()) putExtra(Intent.EXTRA_EMAIL, arrayOf(recipient))
+                    }
+                    context.startActivity(Intent.createChooser(intent, "Envoyer un test par…"))
+                },
+            ) {
+                Text("📧 Tester l'envoi d'email")
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Ouvre ton app email avec un message de test prérempli (destinataire = celui configuré plus haut).",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
