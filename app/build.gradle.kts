@@ -4,6 +4,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+import java.io.File
+import java.util.Base64
+
 android {
     namespace = "com.fabrice.vigie"
     compileSdk = 35
@@ -12,13 +15,32 @@ android {
         applicationId = "com.fabrice.vigie"
         minSdk = 29
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
+    }
+
+    signingConfigs {
+        create("release") {
+            // Keystore stable stocké en secret GitHub (base64) — indispensable
+            // pour les mises à jour automatiques (même signature à chaque build).
+            val b64 = System.getenv("VIGIE_KEYSTORE_B64")
+            if (!b64.isNullOrBlank()) {
+                val tmp = System.getenv("RUNNER_TEMP") ?: System.getProperty("java.io.tmpdir") ?: "/tmp"
+                val ks = File(tmp, "vigie-release.keystore")
+                ks.writeBytes(Base64.getDecoder().decode(b64))
+                storeFile = ks
+                storePassword = System.getenv("VIGIE_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("VIGIE_KEY_ALIAS")
+                keyPassword = System.getenv("VIGIE_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = if (System.getenv("VIGIE_KEYSTORE_B64").isNullOrBlank()) null
+            else signingConfigs.getByName("release")
         }
         debug {
             isMinifyEnabled = false
@@ -68,4 +90,6 @@ dependencies {
     implementation("org.nanohttpd:nanohttpd:2.3.1")
 
     testImplementation("junit:junit:4.13.2")
+    // org.json d'Android est mocké en test unitaire local — on le remplace par la vraie implémentation
+    testImplementation("org.json:json:20231013")
 }

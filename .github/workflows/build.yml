@@ -1,8 +1,11 @@
 # Workflow GitHub Actions Android — build APK + release automatique (validé monuments-nearby/network-scanner, 08/2026)
 #
-# - push sur main  → build assembleDebug + publication release "latest" (écrasée à chaque push)
+# - push sur main  → build assembleRelease signé + publication release "latest" (écrasée à chaque push)
 # - tag v*         → build + release versionnée (tag_name) avec APK renommé vigie-v<version>.apk
 # - workflow_dispatch → build manuel
+#
+# Signature stable : keystore release stocké en secrets GitHub (VIGIE_KEYSTORE_*) —
+# indispensable pour les mises à jour automatiques de l'app (même clé à chaque build).
 name: Build APK
 
 on:
@@ -17,6 +20,11 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      VIGIE_KEYSTORE_B64: ${{ secrets.VIGIE_KEYSTORE_B64 }}
+      VIGIE_KEYSTORE_PASSWORD: ${{ secrets.VIGIE_KEYSTORE_PASSWORD }}
+      VIGIE_KEY_PASSWORD: ${{ secrets.VIGIE_KEY_PASSWORD }}
+      VIGIE_KEY_ALIAS: ${{ secrets.VIGIE_KEY_ALIAS }}
     steps:
       - uses: actions/checkout@v4
 
@@ -38,14 +46,14 @@ jobs:
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --no-daemon
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon
+      - name: Build signed release APK
+        run: ./gradlew assembleRelease --no-daemon
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: app-release
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
       - name: Publish "latest" release (push on main)
@@ -54,12 +62,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VER=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -1)
-          cp app/build/outputs/apk/debug/app-debug.apk "vigie-v${VER}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "vigie-v${VER}.apk"
           gh release delete latest --yes --repo "${{ github.repository }}" 2>/dev/null || true
           for i in 1 2 3 4 5; do
             if gh release create latest "vigie-v${VER}.apk" \
               --title "Latest build" \
-              --notes "APK le plus récent — build automatique du push sur main." \
+              --notes "APK le plus récent — build automatique du push sur main (signé, mise à jour automatique possible)." \
               --repo "${{ github.repository }}"; then
               break
             fi
@@ -73,10 +81,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VER=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -1)
-          cp app/build/outputs/apk/debug/app-debug.apk "vigie-v${VER}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "vigie-v${VER}.apk"
           gh release create "$GITHUB_REF_NAME" "vigie-v${VER}.apk" \
             --title "$GITHUB_REF_NAME" \
-            --notes "Build automatique — APK $GITHUB_REF_NAME." \
+            --notes "Build automatique — APK $GITHUB_REF_NAME (signé, mise à jour automatique possible)." \
             --repo "${{ github.repository }}" \
             || gh release upload "$GITHUB_REF_NAME" "vigie-v${VER}.apk" \
                --clobber --repo "${{ github.repository }}"

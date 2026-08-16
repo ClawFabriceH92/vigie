@@ -11,6 +11,9 @@ import com.fabrice.vigie.stream.MjpegServer
 import com.fabrice.vigie.trust.NetworkScanner
 import com.fabrice.vigie.trust.TrustMonitor
 import com.fabrice.vigie.trust.TrustedDevices
+import com.fabrice.vigie.update.AutoUpdater
+import com.fabrice.vigie.update.UpdateChecker
+import com.fabrice.vigie.update.UpdateInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -88,6 +91,7 @@ object VigieRuntime {
         refreshLocalIp()
         refreshStats()
         startScanLoop()
+        startUpdateLoop()
     }
 
     private fun startServer() {
@@ -195,6 +199,70 @@ object VigieRuntime {
         settingsStore.save(s)
         if (s.trustEnabled) nextScanAt = 0L
         recomputeMode()
+    }
+
+    // ---------- Mise à jour ----------
+
+    enum class UpdateStatus { IDLE, CHECKING, UP_TO_DATE, AVAILABLE, DOWNLOADING, ERROR }
+
+    data class UpdateUiState(
+        val status: UpdateStatus = UpdateStatus.IDLE,
+        val info: UpdateInfo? = null,
+        val message: String? = null,
+    )
+
+    val updateState = MutableStateFlow(UpdateUiState())
+
+    private var updateLoopStarted = false
+
+    private fun startUpdateLoop() {
+        if (updateLoopStarted) return
+        updateLoopStarted = true
+        val s = scope ?: return
+        s.launch {
+            while (isActive) {
+                if (settings.value.autoUpdate) checkForUpdates()
+                // revérifie toutes les 6 h si l'app reste ouverte
+                delay(6 * 60 * 60 * 1000L)
+            }
+        }
+    }
+
+    /** Vérifie GitHub Releases ; télécharge automatiquement si [installIfAvailable] et permission OK. */
+    fun checkForUpdates(installIfAvailable: Boolean = settings.value.autoUpdate) {
+        if (updateState.value.status == UpdateStatus.CHECKING) return
+        updateState.value = UpdateUiState(UpdateStatus.CHECKING)
+        val s = scope ?: return
+        s.launch {
+            val info = withContext(Dispatchers.IO) { UpdateChecker.latestWithApk() }
+            if (info == null) {
+                updateState.value = UpdateUiState(UpdateStatus.ERROR, message = "Vérification impossible (réseau ?)")
+                return@launch
+            }
+            val current = BuildConfig.VERSION_NAME
+            if (UpdateChecker.compareVersions(info.versionName, current) <= 0) {
+                updateState.value = UpdateUiState(UpdateStatus.UP_TO_DATE, info = info)
+                return@launch
+            }
+            updateState.value = UpdateUiState(UpdateStatus.AVAILABLE, info = info)
+            if (installIfAvailable && AutoUpdater.canRequestInstalls(appContext)) {
+                if (AutoUpdater.download(appContext, info.downloadUrl)) {
+                    updateState.value = UpdateUiState(UpdateStatus.DOWNLOADING, info = info)
+                }
+            }
+        }
+    }
+
+    /** Force le téléchargement (bouton manuel), ouvre les réglages système si permission manquante. */
+    fun installUpdate() {
+        val info = updateState.value.info ?: return
+        if (!AutoUpdater.canRequestInstalls(appContext)) {
+            AutoUpdater.openInstallSettings(appContext)
+            return
+        }
+        if (AutoUpdater.download(appContext, info.downloadUrl)) {
+            updateState.value = UpdateUiState(UpdateStatus.DOWNLOADING, info = info)
+        }
     }
 
     // ---------- Mode / confiance ----------

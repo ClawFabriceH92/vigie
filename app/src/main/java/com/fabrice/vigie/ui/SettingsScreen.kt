@@ -36,8 +36,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.fabrice.vigie.BuildConfig
 import com.fabrice.vigie.SurveillanceViewModel
+import com.fabrice.vigie.VigieRuntime
 import com.fabrice.vigie.data.SettingsStore
 import com.fabrice.vigie.ui.theme.AlertRed
 import com.fabrice.vigie.ui.theme.DeepNight
@@ -48,6 +51,7 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
     val settings by vm.settings.collectAsStateWithLifecycle()
     val eventCount by vm.eventCount.collectAsStateWithLifecycle()
     val eventsSizeMb by vm.eventsSizeMb.collectAsStateWithLifecycle()
+    val updateState by vm.updateState.collectAsStateWithLifecycle()
     var showPinDialog by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
 
@@ -153,9 +157,51 @@ fun SettingsScreen(vm: SurveillanceViewModel) {
             }
         }
 
+        SectionCard("Mise à jour") {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text("Mise à jour automatique", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Vérifie GitHub et installe la nouvelle version",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = settings.autoUpdate,
+                    onCheckedChange = { vm.updateSettings(settings.copy(autoUpdate = it)) },
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            UpdateStatusRow(updateState)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { vm.checkForUpdates() },
+                    enabled = updateState.status != VigieRuntime.UpdateStatus.CHECKING,
+                ) {
+                    Text(
+                        when (updateState.status) {
+                            VigieRuntime.UpdateStatus.CHECKING -> "Vérification…"
+                            else -> "Vérifier maintenant"
+                        }
+                    )
+                }
+                if (updateState.status == VigieRuntime.UpdateStatus.AVAILABLE) {
+                    Button(onClick = { vm.installUpdate() }) {
+                        Text("Télécharger v${updateState.info?.versionName ?: ""}")
+                    }
+                }
+            }
+        }
+
         Spacer(Modifier.height(8.dp))
         Text(
-            "Vigie v0.1.0 — surveillance locale. Les photos restent sur cet appareil.",
+            "Vigie v${BuildConfig.VERSION_NAME} — surveillance locale. Les photos restent sur cet appareil.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -243,6 +289,31 @@ private fun PinChangeDialog(vm: SurveillanceViewModel, onDismiss: () -> Unit) {
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Annuler") }
         },
+    )
+}
+
+@Composable
+private fun UpdateStatusRow(state: VigieRuntime.UpdateUiState) {
+    val text: String = when (state.status) {
+        VigieRuntime.UpdateStatus.IDLE -> "Version installée : v${BuildConfig.VERSION_NAME}"
+        VigieRuntime.UpdateStatus.CHECKING -> "Vérification de la dernière version…"
+        VigieRuntime.UpdateStatus.UP_TO_DATE -> "✓ À jour (v${BuildConfig.VERSION_NAME})"
+        VigieRuntime.UpdateStatus.AVAILABLE -> "⬆ Mise à jour v${state.info?.versionName ?: ""} disponible"
+        VigieRuntime.UpdateStatus.DOWNLOADING -> "Téléchargement en cours… (notification Android)"
+        VigieRuntime.UpdateStatus.ERROR -> state.message ?: "Erreur de vérification"
+    }
+    val color: Color = when (state.status) {
+        VigieRuntime.UpdateStatus.IDLE -> MaterialTheme.colorScheme.onSurfaceVariant
+        VigieRuntime.UpdateStatus.CHECKING -> MaterialTheme.colorScheme.onSurfaceVariant
+        VigieRuntime.UpdateStatus.UP_TO_DATE -> TrustGreen
+        VigieRuntime.UpdateStatus.AVAILABLE -> MaterialTheme.colorScheme.primary
+        VigieRuntime.UpdateStatus.DOWNLOADING -> MaterialTheme.colorScheme.primary
+        VigieRuntime.UpdateStatus.ERROR -> AlertRed
+    }
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = color,
     )
 }
 

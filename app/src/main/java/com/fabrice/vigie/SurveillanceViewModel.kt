@@ -40,6 +40,7 @@ class SurveillanceViewModel(application: Application) : AndroidViewModel(applica
     val eventCount: StateFlow<Int> get() = VigieRuntime.eventCount
     val eventsSizeMb: StateFlow<Float> get() = VigieRuntime.eventsSizeMb
     val serviceRunning: StateFlow<Boolean> get() = VigieRuntime.serviceRunning
+    val updateState: StateFlow<VigieRuntime.UpdateUiState> get() = VigieRuntime.updateState
 
     // PIN
     fun isPinSet(): Boolean = VigieRuntime.isPinSet()
@@ -53,6 +54,10 @@ class SurveillanceViewModel(application: Application) : AndroidViewModel(applica
 
     // Réglages
     fun updateSettings(s: SettingsStore.Settings) = VigieRuntime.updateSettings(s)
+
+    // Mise à jour
+    fun checkForUpdates() = VigieRuntime.checkForUpdates()
+    fun installUpdate() = VigieRuntime.installUpdate()
 
     // Mode
     fun setManualMode(armed: Boolean) = VigieRuntime.setManualMode(armed)

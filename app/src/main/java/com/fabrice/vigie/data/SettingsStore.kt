@@ -21,6 +21,7 @@ class SettingsStore(context: Context) {
         val trustScanIntervalSec: Int = 60,   // période de scan réseau (s)
         val trustDisarmDelaySec: Int = 120,   // délai sans confiance avant armement (s)
         val trustEnabled: Boolean = true,     // mode confiance actif
+        val autoUpdate: Boolean = true,       // vérifier + installer les MAJ automatiquement
     )
 
     fun load(): Settings = Settings(
@@ -33,6 +34,7 @@ class SettingsStore(context: Context) {
         trustScanIntervalSec = prefs.getInt("trust_scan_interval_sec", 60),
         trustDisarmDelaySec = prefs.getInt("trust_disarm_delay_sec", 120),
         trustEnabled = prefs.getBoolean("trust_enabled", true),
+        autoUpdate = prefs.getBoolean("auto_update", true),
     )
 
     fun save(s: Settings) {
@@ -46,6 +48,7 @@ class SettingsStore(context: Context) {
             .putInt("trust_scan_interval_sec", s.trustScanIntervalSec)
             .putInt("trust_disarm_delay_sec", s.trustDisarmDelaySec)
             .putBoolean("trust_enabled", s.trustEnabled)
+            .putBoolean("auto_update", s.autoUpdate)
             .apply()
     }
 }
