@@ -15,8 +15,8 @@ android {
         applicationId = "com.fabrice.vigie"
         minSdk = 29
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.4.0"
     }
 
     signingConfigs {
@@ -88,6 +88,7 @@ dependencies {
     implementation("androidx.camera:camera-view:1.3.4")
     // Serveur MJPEG embarqué
     implementation("org.nanohttpd:nanohttpd:2.3.1")
+    implementation("org.nanohttpd:nanohttpd-websocket:2.3.1")
 
     testImplementation("junit:junit:4.13.2")
     // org.json d'Android est mocké en test unitaire local — on le remplace par la vraie implémentation

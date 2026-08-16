@@ -6,6 +6,7 @@ import android.os.SystemClock
 import com.fabrice.vigie.camera.CameraBridge
 import com.fabrice.vigie.data.EventStore
 import com.fabrice.vigie.data.SettingsStore
+import com.fabrice.vigie.intercom.IntercomServer
 import com.fabrice.vigie.security.PinHasher
 import com.fabrice.vigie.stream.MjpegServer
 import com.fabrice.vigie.trust.NetworkScanner
@@ -39,6 +40,7 @@ object VigieRuntime {
     private lateinit var trustedDevices: TrustedDevices
     private lateinit var eventStore: EventStore
     private var server: MjpegServer? = null
+    private var intercom: IntercomServer? = null
     private var scope: CoroutineScope? = null
 
     // ---------- État exposé ----------
@@ -61,6 +63,7 @@ object VigieRuntime {
     val eventCount = MutableStateFlow(0)
     val eventsSizeMb = MutableStateFlow(0f)
     val serviceRunning = MutableStateFlow(false)
+    val intercomMuted = MutableStateFlow(false)
 
     // ---------- Interne ----------
 
@@ -102,6 +105,13 @@ object VigieRuntime {
         } catch (_: Exception) {
             streamRunning.value = false
         }
+        // Intercom : démarre indépendamment (ne bloque pas si le port est pris)
+        intercom = IntercomServer(appContext) { settings.value.streamPassword }
+        try {
+            intercom?.start()
+        } catch (_: Exception) {
+            intercom = null
+        }
     }
 
     fun stopServer() {
@@ -111,6 +121,11 @@ object VigieRuntime {
         }
         server = null
         streamRunning.value = false
+        try {
+            intercom?.shutdown()
+        } catch (_: Exception) {
+        }
+        intercom = null
     }
 
     private fun startScanLoop() {
@@ -202,7 +217,6 @@ object VigieRuntime {
     }
 
     // ---------- Mise à jour ----------
-
     enum class UpdateStatus { IDLE, CHECKING, UP_TO_DATE, AVAILABLE, DOWNLOADING, ERROR }
 
     data class UpdateUiState(
@@ -262,6 +276,15 @@ object VigieRuntime {
         }
         if (AutoUpdater.download(appContext, info.downloadUrl)) {
             updateState.value = UpdateUiState(UpdateStatus.DOWNLOADING, info = info)
+        }
+    }
+
+    // Intercom
+    fun setIntercomMuted(muted: Boolean) {
+        intercomMuted.value = muted
+        try {
+            intercom?.setMuted(muted)
+        } catch (_: Exception) {
         }
     }
 

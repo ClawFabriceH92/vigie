@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     val needed = buildList {
                         add(Manifest.permission.CAMERA)
+                        add(Manifest.permission.RECORD_AUDIO)
                         if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
                     }.filter {
                         ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED

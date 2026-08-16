@@ -132,6 +132,7 @@ private fun HomeOverlay(vm: SurveillanceViewModel) {
     val lastEvent by vm.lastEvent.collectAsStateWithLifecycle()
     val burstActive by vm.burstActive.collectAsStateWithLifecycle()
     val streamRunning by vm.streamRunning.collectAsStateWithLifecycle()
+    val intercomMuted by vm.intercomMuted.collectAsStateWithLifecycle()
 
     Box(Modifier.fillMaxSize()) {
         // Dégradé pour la lisibilité
@@ -217,10 +218,26 @@ private fun HomeOverlay(vm: SurveillanceViewModel) {
             }
             Spacer(Modifier.height(10.dp))
             Text(
-                text = if (streamRunning) "Flux : http://${localIp ?: "?"}:8080/stream · protégé" else "Flux indisponible",
+                text = if (streamRunning) "Flux : http://${localIp ?: "?"}:8080/stream · Intercom : :8081" else "Flux indisponible",
                 style = MaterialTheme.typography.labelMedium,
                 color = Color(0xFFB8C7DA),
             )
+            if (streamRunning) {
+                Spacer(Modifier.height(6.dp))
+                Surface(
+                    color = if (intercomMuted) Color(0x66FFFFFF) else Amber,
+                    shape = RoundedCornerShape(14.dp),
+                    onClick = { vm.setIntercomMuted(!intercomMuted) },
+                ) {
+                    Text(
+                        if (intercomMuted) "🔇 Haut-parleur intercom : muet (toucher pour activer)" else "🔊 Haut-parleur intercom : actif, volume max (toucher pour couper)",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (intercomMuted) Color(0xFFB8C7DA) else DeepNight,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
             lastEvent?.let { ev ->
                 Spacer(Modifier.height(6.dp))
                 Text(
