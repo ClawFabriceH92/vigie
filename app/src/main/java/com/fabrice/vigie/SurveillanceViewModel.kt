@@ -48,6 +48,7 @@ class SurveillanceViewModel(application: Application) : AndroidViewModel(applica
     fun setPin(pin: String) = VigieRuntime.setPin(pin)
     fun changePin(oldPin: String, newPin: String): Boolean = VigieRuntime.changePin(oldPin, newPin)
     fun verifyPin(pin: String): Boolean = VigieRuntime.verifyPin(pin)
+    fun unlock() = VigieRuntime.unlock()
     fun lock() = VigieRuntime.lock()
 
     // Navigation

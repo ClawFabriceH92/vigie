@@ -5,11 +5,12 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -17,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -25,8 +27,9 @@ import com.fabrice.vigie.ui.MainScreen
 import com.fabrice.vigie.ui.PinMode
 import com.fabrice.vigie.ui.PinScreen
 import com.fabrice.vigie.ui.theme.VigieTheme
+import java.util.concurrent.Executors
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private val vm: SurveillanceViewModel by viewModels()
 
@@ -78,6 +81,7 @@ class MainActivity : ComponentActivity() {
                         PinScreen(
                             mode = PinMode.VERIFY,
                             onVerify = { pin -> vm.verifyPin(pin) },
+                            onBiometric = { showBiometricPrompt() },
                         )
                     } else {
                         PinScreen(
@@ -90,5 +94,32 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun showBiometricPrompt() {
+        val bm = BiometricManager.from(this)
+        if (bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) !=
+            BiometricManager.BIOMETRIC_SUCCESS
+        ) {
+            return
+        }
+        val executor = Executors.newSingleThreadExecutor()
+        val prompt = BiometricPrompt(
+            this,
+            executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    runOnUiThread { vm.unlock() }
+                }
+            },
+        )
+        prompt.authenticate(
+            BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Déverrouiller Vigie")
+                .setSubtitle("Utilise ton empreinte ou ton visage")
+                .setNegativeButtonText("Annuler")
+                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                .build()
+        )
     }
 }

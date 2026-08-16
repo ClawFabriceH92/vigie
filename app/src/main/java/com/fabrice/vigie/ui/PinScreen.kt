@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +44,7 @@ fun PinScreen(
     mode: PinMode,
     onPinValidated: (String) -> Unit = {},
     onVerify: (String) -> Boolean = { false },
+    onBiometric: (() -> Unit)? = null,
 ) {
     var phase by remember { mutableStateOf(if (mode == PinMode.CREATE) 1 else 0) }
     var firstPin by remember { mutableStateOf("") }
@@ -135,6 +137,17 @@ fun PinScreen(
 
             Spacer(Modifier.height(40.dp))
             Keypad(onDigit = ::onDigit, onBackspace = ::onBackspace)
+
+            if (mode == PinMode.VERIFY && onBiometric != null) {
+                Spacer(Modifier.height(24.dp))
+                TextButton(onClick = onBiometric) {
+                    Text(
+                        "🔓 Déverrouiller par empreinte / visage",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = Amber,
+                    )
+                }
+            }
         }
     }
 }

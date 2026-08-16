@@ -219,6 +219,11 @@ object VigieRuntime {
         return true
     }
 
+    /** Déverrouillage sans PIN (biométrie réussie). */
+    fun unlock() {
+        locked.value = false
+    }
+
     fun lock() {
         if (isPinSet()) locked.value = true
     }
